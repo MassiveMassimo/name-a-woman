@@ -13,6 +13,8 @@
     "@astrojs/check": "^0.5.10",
     "@astrojs/react": "^3.3.1",
     "@astrojs/tailwind": "^5.1.0",
+    "@astrojs/vercel": "^7.5.4",
+    "@supabase/supabase-js": "^2.42.7",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.0",
     "astro": "^4.7.0",
@@ -24,6 +26,7 @@
     "tailwind-merge": "^2.3.0",
     "tailwindcss": "^3.4.3",
     "tailwindcss-animate": "^1.0.7",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "typesense": "^1.8.2"
   }
 }

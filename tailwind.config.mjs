@@ -1,3 +1,5 @@
+import defaultTheme from "tailwindcss/defaultTheme";
+
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ["class"],
@@ -12,6 +14,9 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['"Marlin Soft SQ Regular"', ...defaultTheme.fontFamily.sans],
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },

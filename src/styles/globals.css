@@ -1,4 +1,31 @@
 @tailwind base;
-  @tailwind components;
-  @tailwind utilities;
-  
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+/* Register your custom font family and tell the browser where to find it. */
+@font-face {
+  font-family: "Marlin Soft SQ Regular";
+  src: url("/fonts/Marlin Soft SQ Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Marlin Soft SQ Bold";
+  src: url("/fonts/Marlin Soft SQ Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Marlin Soft SQ Medium";
+  src: url("/fonts/Marlin Soft SQ Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
