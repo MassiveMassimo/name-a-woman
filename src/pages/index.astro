@@ -7,13 +7,12 @@ import { Input } from "@/components/ui/input";
 
 <Layout title="Name a Woman">
   <main
-    class="min-h-svh bg-slate-100 dark:bg-slate-900 flex items-center justify-center flex-col"
+    class="flex min-h-svh flex-col items-center justify-center bg-slate-100 px-5 dark:bg-slate-900 sm:px-10 lg:px-40"
   >
-    <h1 class="text-5xl font-bold">Name a woman</h1>
     <Input
-      className="input self-center"
-      type="email"
-      placeholder="Name a real woman famous enough to have a Wikipedia page"
+      className="input h-auto self-center rounded-none border-x-0 border-b-4 border-t-0 bg-transparent text-4xl sm:text-7xl lg:text-9xl capitalize ring-0 ring-offset-transparent transition-colors duration-300 placeholder:normal-case placeholder:text-slate-300 focus-visible:border-slate-700 focus-visible:ring-0 focus-visible:ring-transparent focus-visible:placeholder:text-slate-400"
+      type="text"
+      placeholder="Name a woman"
     />
   </main>
 </Layout>
@@ -21,34 +20,37 @@ import { Input } from "@/components/ui/input";
 <script>
   import { supabase } from "@/lib/supabase";
 
-  // Find the input with the `main-input` class
   const input = document.querySelector<HTMLInputElement>("input.input");
 
-  let timeoutId: number | undefined; // Variable to store the timeout ID
+  // Function to perform the fuzzy search
+  async function performFuzzySearch(searchTerm: string) {
+    // Perform the fuzzy search on the "women" table
+    const { data, error } = await supabase.rpc("search_woman", {
+      input_name: searchTerm,
+    });
 
-  // Handle input events on the input field
-  input?.addEventListener("input", (e) => {
-    const target = e.target as HTMLInputElement;
-
-    // Clear the previous timeout
-    if (timeoutId) {
-      clearTimeout(timeoutId);
+    if (error) {
+      console.error("Error fetching data:", error);
+    } else {
+      console.log(data);
     }
+  }
 
-    // Set a new timeout to log the input value after 500ms of inactivity
-    timeoutId = window.setTimeout(async () => {
-      const searchTerm = target.value;
+  // Handle form submission
+  input?.closest("form")?.addEventListener("submit", async (e) => {
+    e.preventDefault(); // Prevent default form submission behavior
+    const searchTerm = input.value.trim();
+    await performFuzzySearch(searchTerm);
+    input.value = ""; // Clear the input field after submitting
+  });
 
-      // Perform the fuzzy search on the "women" table
-      const { data, error } = await supabase.rpc("search_woman", {
-        input_name: searchTerm,
-      });
-
-      if (error) {
-        console.error("Error fetching data:", error);
-      } else {
-        console.log(data);
-      }
-    }, 150);
+  // Handle Enter key press
+  input?.addEventListener("keypress", async (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault(); // Prevent default form submission behavior
+      const searchTerm = input.value.trim();
+      await performFuzzySearch(searchTerm);
+      input.value = ""; // Clear the input field after submitting
+    }
   });
 </script>
