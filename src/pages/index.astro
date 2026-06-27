@@ -1,56 +1,45 @@
 ---
-import Layout from "../layouts/Layout.astro";
-import Card from "../components/Card.astro";
-import "@/styles/globals.css";
 import { Input } from "@/components/ui/input";
+import Layout from "../layouts/Layout.astro";
 ---
 
 <Layout title="Name a Woman">
-  <main
-    class="flex min-h-svh flex-col items-center justify-center bg-slate-100 px-5 dark:bg-slate-900 sm:px-10 lg:px-40"
-  >
-    <Input
-      className="input h-auto self-center rounded-none border-x-0 border-b-4 border-t-0 bg-transparent text-4xl sm:text-7xl lg:text-9xl capitalize ring-0 ring-offset-transparent transition-colors duration-300 placeholder:normal-case placeholder:text-slate-300 focus-visible:border-slate-700 focus-visible:ring-0 focus-visible:ring-transparent focus-visible:placeholder:text-slate-400"
-      type="text"
-      placeholder="Name a woman"
-    />
-  </main>
+	<main
+		class="flex min-h-svh flex-col items-center justify-center bg-slate-100 px-5 sm:px-10 lg:px-40 dark:bg-slate-900"
+	>
+		<form id="search" class="w-full">
+			<Input
+				className="input h-auto w-full rounded-none border-x-0 border-t-0 border-b-4 bg-transparent text-4xl capitalize ring-0 ring-offset-transparent transition-colors duration-300 placeholder:normal-case placeholder:text-slate-300 focus-visible:border-slate-700 focus-visible:ring-0 focus-visible:ring-transparent focus-visible:placeholder:text-slate-400 sm:text-7xl lg:text-9xl"
+				type="text"
+				name="name"
+				placeholder="Name a woman"
+				autoComplete="off"
+			/>
+		</form>
+	</main>
 </Layout>
 
 <script>
-  import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
-  const input = document.querySelector<HTMLInputElement>("input.input");
+const form = document.querySelector<HTMLFormElement>("#search");
+const input = form?.querySelector<HTMLInputElement>("input");
 
-  // Function to perform the fuzzy search
-  async function performFuzzySearch(searchTerm: string) {
-    // Perform the fuzzy search on the "women" table
-    const { data, error } = await supabase.rpc("search_woman", {
-      input_name: searchTerm,
-    });
+form?.addEventListener("submit", async (event) => {
+	event.preventDefault();
+	const name = input?.value.trim();
+	if (!name) return;
 
-    if (error) {
-      console.error("Error fetching data:", error);
-    } else {
-      console.log(data);
-    }
-  }
+	// Fuzzy search backed by the `search_woman` Postgres function.
+	const { data, error } = await supabase.rpc("search_woman", {
+		input_name: name,
+	});
+	if (error) {
+		console.error("search_woman failed:", error);
+		return;
+	}
 
-  // Handle form submission
-  input?.closest("form")?.addEventListener("submit", async (e) => {
-    e.preventDefault(); // Prevent default form submission behavior
-    const searchTerm = input.value.trim();
-    await performFuzzySearch(searchTerm);
-    input.value = ""; // Clear the input field after submitting
-  });
-
-  // Handle Enter key press
-  input?.addEventListener("keypress", async (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault(); // Prevent default form submission behavior
-      const searchTerm = input.value.trim();
-      await performFuzzySearch(searchTerm);
-      input.value = ""; // Clear the input field after submitting
-    }
-  });
+	console.log(data);
+	if (input) input.value = "";
+});
 </script>

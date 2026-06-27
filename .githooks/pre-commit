@@ -1,0 +1,7 @@
+#!/bin/sh
+# Format, lint, and apply safe + unsafe fixes (incl. Tailwind class sort) to
+# staged files via Biome's built-in --staged. Blocks the commit on unfixable
+# errors. Re-stages anything Biome rewrote.
+./node_modules/.bin/biome check --staged --write --unsafe \
+	--no-errors-on-unmatched --files-ignore-unknown=true
+git update-index --again
