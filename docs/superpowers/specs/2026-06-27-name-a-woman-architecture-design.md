@@ -19,7 +19,9 @@ all" — every woman who has an English Wikipedia article.
   ("Marie Curie"). There is **no autocomplete dropdown** — that would turn recall into
   recognition, which the scoring rule explicitly rejects.
 - On a valid, unique match: a card animates onto the wall, input clears, score increments.
-- On an ambiguous/invalid guess: a short reject cue (shake), no card, no score.
+- On an ambiguous/invalid guess: a short reject cue (shake), no card, no score. The message
+  is terse and non-coaching: ambiguous (`status: "ambiguous"`) → "too common"; no match
+  (`status: "none"`) → "not found". No instructional helper text (no "add a surname").
 - A woman already named this round cannot be scored twice.
 
 **Two layers of state**
@@ -172,6 +174,24 @@ sprint); CSS/WAAPI over JS on the hot path; `ease-out` for entrances under ~300m
 
 Card start state is `scale(0.95)` + opacity, never `scale(0)`. The countdown's numeric readout
 is the only thing React updates per second; the smooth visual sweep is a single CSS transition.
+
+### Card composition & image strategy
+
+A scored card shows: the woman's **photo**, her **name**, and a **short Wikipedia extract**. It
+slides up from the bottom of the wall on the card-drop animation.
+
+**Both the photo and the extract come from one lazy call**, made when the card is created:
+`GET https://en.wikipedia.org/api/rest_v1/page/summary/<title>` returns the thumbnail URL and
+the short description together. The index ships **no per-woman image or description** — only the
+`name` (= the exact article title), which is the key for this call and for the article link
+(`en.wikipedia.org/wiki/<name>`, derived, not stored). With ~435k women and only a few dozen
+cards shown per round, lazy-fetching is the correct payload tradeoff.
+
+Loading/failure UX (display-only, not on the matching hot path):
+- While the summary loads: a **blur-up placeholder** in the card's photo slot.
+- On network failure / no thumbnail: a neutral **placeholder image** (blurred silhouette). The
+  card still shows name + (if available) extract; a missing photo never blocks the card.
+- **Prefetch is a v1 nice-to-have**, not required — fetch-on-card-create is the baseline.
 
 ## 9. v1 scope cuts (add later, none change the core)
 
