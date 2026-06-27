@@ -38,7 +38,7 @@ Returns ~435k rows. Per item, the query also pulls the fields in §3.
 | --- | --- | --- |
 | `id` | **Wikidata QID, numeric part** (`Q7186` → `7186`) | Stable for life → safe key for the global `discovered` table across monthly rebuilds. Never a sequential index. |
 | `name` | **exact `enwiki` article title** | Doubles as: the match display name, the article link (`/wiki/<name>`), and the key for the lazy photo+extract summary call. Store verbatim (not normalized — the engine normalizes internally). |
-| `aliases` | Wikidata `skos:altLabel` (all languages), deduped | Carries mononyms / maiden names / transliterations. This is what makes last-name-only guesses like "Megawati" resolve via the engine's exact branch. |
+| `aliases` | **English** Wikidata `skos:altLabel`, deduped | Carries mononyms / maiden names. English-only for v1: non-Latin-script aliases can't be typed by a Latin-keyboard player and only bloat the payload (other Latin scripts are a later coverage item). This is what makes last-name-only guesses like "Megawati" resolve via the engine's exact branch. |
 | `notability` | **sitelink count** (`wikibase:sitelinks`) | v1 notability signal — free, in the same query. Drives the disambiguation margin K. (Pageviews is the documented upgrade; see §6.) |
 
 ## 4. Stages (one Bun script, reuses `src/match`)
