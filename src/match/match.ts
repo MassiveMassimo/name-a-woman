@@ -1,4 +1,5 @@
 // src/match/match.ts
+import uFuzzy from "@leeoniya/ufuzzy";
 import { bucketKey } from "./build";
 import { normalize } from "./normalize";
 import type { IndexEntry, MatchIndex, WomanRecord } from "./types";
@@ -7,6 +8,16 @@ import type { IndexEntry, MatchIndex, WomanRecord } from "./types";
 // second by this factor to win outright; otherwise the query is ambiguous.
 // Tunable — calibrate against a real eval set (spec §2, §10).
 export const K = 5;
+
+// Single-edit fuzzy matcher: tolerate one insert, substitute, transpose, or
+// delete per term. Constructed once at module load (zero-overhead haystack).
+const uf = new uFuzzy({
+	intraMode: 1,
+	intraIns: 1,
+	intraSub: 1,
+	intraTrn: 1,
+	intraDel: 1,
+});
 
 export type MatchResult =
 	| { status: "matched"; woman: WomanRecord }
@@ -50,8 +61,15 @@ export function match(input: string, index: MatchIndex): MatchResult {
 	const exact = bucket.filter((e) => e.form === q);
 	if (exact.length > 0) return judge(index, topByWoman(exact));
 
-	// No exact match. If the query only prefixes many forms, the player typed an
-	// incomplete/too-common fragment → reject as ambiguous. (Typo handling: Task 4.)
+	// No exact match: try a single-edit fuzzy pass over this bucket's forms.
+	const forms = bucket.map((e) => e.form);
+	const idxs = uf.filter(forms, q);
+	if (idxs && idxs.length > 0) {
+		const fuzzy = idxs.map((i) => bucket[i]);
+		return judge(index, topByWoman(fuzzy));
+	}
+
+	// No exact, no fuzzy. A pure prefix of many forms = incomplete/too-common.
 	const prefix = bucket.filter((e) => e.form.startsWith(q));
 	if (prefix.length > 0) return { status: "ambiguous" };
 
