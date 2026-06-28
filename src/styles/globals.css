@@ -221,3 +221,9 @@
 		color: var(--color-gray-600);
 	}
 }
+
+/* Size-match Fraunces to Marlin (smaller x-height) and crank WONK to max. */
+.fake-placeholder .font-fraunces {
+	font-size: 1.1em;
+	font-variation-settings: "WONK" 1;
+}
