@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { initialState, ROUND_SECONDS, reduce } from "./state";
+import { type GameState, initialState, ROUND_SECONDS, reduce } from "./state";
 
 describe("reduce", () => {
 	it("starts idle with an empty round", () => {
@@ -54,7 +54,7 @@ describe("reduce", () => {
 	});
 
 	it("TICK decrements and ends the round at zero", () => {
-		let s = { phase: "playing" as const, named: [], timeLeft: 2 };
+		let s: GameState = { phase: "playing", named: [], timeLeft: 2 };
 		s = reduce(s, { type: "TICK" });
 		expect(s.timeLeft).toBe(1);
 		expect(s.phase).toBe("playing");
