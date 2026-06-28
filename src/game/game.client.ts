@@ -106,7 +106,7 @@ function init(game: HTMLElement): void {
 		card.innerHTML = `
 			<div class="max-w-xl">
 				<strong class="t-stagger-line t-stagger-line--1 font-fraunces font-medium text-5xl leading-tight text-gray-900 sm:text-6xl dark:text-gray-100" data-title></strong>
-				<span class="t-stagger-line t-stagger-line--2 mt-4 block text-xl text-gray-600 sm:text-2xl dark:text-gray-400">
+				<span class="t-stagger-line t-stagger-line--2 mt-4 block min-h-24 text-xl text-gray-600 sm:text-2xl dark:text-gray-400">
 					<span class="t-text-swap" data-extract></span>
 				</span>
 			</div>`;
