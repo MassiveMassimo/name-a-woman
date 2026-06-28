@@ -10,9 +10,10 @@ import {
 } from "./animations";
 import { isDevMode } from "./dev";
 import { getCount, reportDiscovery } from "./global";
+import { createParticleField } from "./particle-field";
 import { resolveGuess } from "./resolve";
 import { type GameState, initialState, reduce } from "./state";
-import { fetchSummary } from "./summary";
+import { fetchSummary, type Summary } from "./summary";
 
 const root = document.getElementById("game");
 if (root) init(root);
@@ -38,6 +39,11 @@ function init(game: HTMLElement): void {
 	const finalEl = $("final");
 	const again = $<HTMLButtonElement>("again");
 
+	const bgCanvas = document.getElementById(
+		"bg-field",
+	) as HTMLCanvasElement | null;
+	const field = bgCanvas ? createParticleField(bgCanvas) : null;
+
 	const dev = isDevMode(window.location.search);
 	let state: GameState = initialState();
 	let index: MatchIndex | null = null;
@@ -59,7 +65,12 @@ function init(game: HTMLElement): void {
 
 	function dispatch(action: Parameters<typeof reduce>[1]): void {
 		state = reduce(state, action);
-		if (state.phase === "over") clearInterval(timerId);
+		if (state.phase === "over") {
+			clearInterval(timerId);
+			field?.pause();
+		} else if (action.type === "RESET") {
+			field?.resume();
+		}
 		render();
 	}
 
@@ -75,8 +86,11 @@ function init(game: HTMLElement): void {
 	}
 
 	// Build one card: pulsing skeleton + content layer in a fixed slot, then
-	// fail-open fetch the summary and cross-fade the content in (.is-revealed).
-	function buildCard(title: string): HTMLElement {
+	// cross-fade the content in (.is-revealed) when the shared summary resolves.
+	function buildCard(
+		title: string,
+		summaryPromise: Promise<Summary>,
+	): HTMLElement {
 		const card = document.createElement("div");
 		card.className =
 			"card t-skel h-52 w-36 shrink-0 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800";
@@ -99,7 +113,7 @@ function init(game: HTMLElement): void {
 			</div>`;
 		// textContent (not innerHTML) for untrusted data
 		(card.querySelector("[data-title]") as HTMLElement).textContent = title;
-		fetchSummary(title).then((s) => {
+		summaryPromise.then((s) => {
 			(card.querySelector("[data-extract]") as HTMLElement).textContent =
 				s.extract ?? "";
 			if (s.thumb) {
@@ -145,11 +159,19 @@ function init(game: HTMLElement): void {
 				type: "ACCEPT",
 				woman: { id: g.woman.id, title: g.woman.name },
 			});
-			const card = buildCard(g.woman.name);
+			// One summary fetch serves both the card content and the background field
+			const summaryPromise = fetchSummary(g.woman.name);
+			const card = buildCard(g.woman.name, summaryPromise);
 			wall.prepend(card);
 			flyCardIn(card, input);
 			reflow(flip);
 			wall.scrollLeft = 0;
+			// Morph the particle field to the new woman's portrait; fail-open
+			summaryPromise
+				.then((s) => {
+					if (s.thumb) field?.morphTo(s.thumb);
+				})
+				.catch(() => {});
 			// fire-and-forget global write; fail-open
 			reportDiscovery(g.woman.id, value)
 				.then((r) => setCount(r.count))

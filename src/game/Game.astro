@@ -3,10 +3,18 @@
 // bundled by the <script> below — no framework runtime ships.
 ---
 
+<!-- particle-field background; masked so the left edge and bottom fade away -->
+<div id="bg" class="pointer-events-none fixed inset-0 z-0">
+	<canvas
+		id="bg-field"
+		class="block h-full w-full mask-l-from-30% mask-b-from-60%"
+	></canvas>
+</div>
+
 <main
 	id="game"
 	data-phase="idle"
-	class="group relative flex min-h-svh flex-col bg-gray-50 px-5 data-[phase=idle]:items-center data-[phase=idle]:justify-center sm:px-10 lg:px-20 dark:bg-gray-900"
+	class="group relative z-10 flex min-h-svh flex-col px-5 data-[phase=idle]:items-center data-[phase=idle]:justify-center sm:px-10 lg:px-20"
 >
 	<!-- corner readouts; held hidden until the index loads to avoid a "0 of 0" flash -->
 	<div
