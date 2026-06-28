@@ -1,14 +1,15 @@
 import { buildIndex, type MatchIndex, parseRecords } from "../match";
 import {
-	captureCards,
 	clearReject,
+	clearWall,
 	dockInput,
-	flyCardIn,
 	hideParticleField,
-	reflow,
 	rejectShake,
+	revealExtract,
 	revealParticleField,
 	tickCounter,
+	transitionCardIn,
+	transitionCardOut,
 } from "./animations";
 import { isDevMode } from "./dev";
 import { getCount, reportDiscovery } from "./global";
@@ -89,50 +90,31 @@ function init(game: HTMLElement): void {
 		timerId = setInterval(() => dispatch({ type: "TICK" }), 1000);
 	}
 
-	// Build one card: pulsing skeleton + content layer in a fixed slot, then
-	// cross-fade the content in (.is-revealed) when the shared summary resolves.
+	// Extract the first sentence from a Wikipedia extract string.
+	function firstSentence(text: string): string {
+		const idx = text.search(/[.!?]\s/);
+		return idx >= 0 ? text.slice(0, idx + 1) : text;
+	}
+
+	// Build a single full-bleed card: large name (left-aligned) + first Wikipedia
+	// sentence. The name is synchronous; the extract blur-fades in on resolve.
 	function buildCard(
 		title: string,
 		summaryPromise: Promise<Summary>,
 	): HTMLElement {
 		const card = document.createElement("div");
 		card.className =
-			"card t-skel h-52 w-36 shrink-0 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800";
+			"card absolute inset-0 flex items-center px-5 sm:px-10 lg:px-20";
 		card.innerHTML = `
-			<div class="t-skel-skeleton is-pulsing">
-				<div class="h-24 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700"></div>
-				<div class="space-y-2 p-2.5">
-					<div class="h-3.5 w-3/4 rounded bg-gray-200 dark:bg-gray-700"></div>
-					<div class="h-2.5 w-full rounded bg-gray-200 dark:bg-gray-700"></div>
-					<div class="h-2.5 w-full rounded bg-gray-200 dark:bg-gray-700"></div>
-					<div class="h-2.5 w-2/3 rounded bg-gray-200 dark:bg-gray-700"></div>
-				</div>
-			</div>
-			<div class="t-skel-content">
-				<div class="relative h-24 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-600 dark:to-gray-700" data-thumb></div>
-				<div class="p-2.5">
-					<div class="line-clamp-2 font-medium text-gray-900 text-sm leading-tight dark:text-gray-100" data-title></div>
-					<div class="mt-1 line-clamp-3 text-[11px] text-gray-500 leading-snug dark:text-gray-400" data-extract></div>
-				</div>
+			<div class="max-w-xl">
+				<h2 class="font-fraunces font-medium text-5xl leading-tight text-gray-900 sm:text-6xl dark:text-gray-100" data-title></h2>
+				<p class="mt-4 text-xl text-gray-600 sm:text-2xl dark:text-gray-400" data-extract></p>
 			</div>`;
-		// textContent (not innerHTML) for untrusted data
 		(card.querySelector("[data-title]") as HTMLElement).textContent = title;
+		const extractEl = card.querySelector("[data-extract]") as HTMLElement;
 		summaryPromise.then((s) => {
-			(card.querySelector("[data-extract]") as HTMLElement).textContent =
-				s.extract ?? "";
-			if (s.thumb) {
-				const img = document.createElement("img");
-				img.src = s.thumb;
-				img.alt = title;
-				img.loading = "lazy";
-				img.className =
-					"h-full w-full object-cover opacity-0 transition-opacity duration-300";
-				img.addEventListener("load", () => {
-					img.style.opacity = "1";
-				});
-				(card.querySelector("[data-thumb]") as HTMLElement).appendChild(img);
-			}
-			card.classList.add("is-revealed");
+			extractEl.textContent = s.extract ? firstSentence(s.extract) : "";
+			if (extractEl.textContent) revealExtract(extractEl);
 		});
 		return card;
 	}
@@ -158,7 +140,6 @@ function init(game: HTMLElement): void {
 		const namedIds = new Set(state.named.map((n) => n.id));
 		const g = resolveGuess(value, index, namedIds);
 		if (g.kind === "accept") {
-			const flip = captureCards([...wall.children]);
 			dispatch({
 				type: "ACCEPT",
 				woman: { id: g.woman.id, title: g.woman.name },
@@ -166,10 +147,13 @@ function init(game: HTMLElement): void {
 			// One summary fetch serves both the card content and the background field
 			const summaryPromise = fetchSummary(g.woman.name);
 			const card = buildCard(g.woman.name, summaryPromise);
-			wall.prepend(card);
-			flyCardIn(card, input);
-			reflow(flip);
-			wall.scrollLeft = 0;
+			// Crossfade: existing card(s) exit upward while new card enters from below
+			const existing = [...wall.children] as HTMLElement[];
+			wall.appendChild(card);
+			transitionCardIn(card);
+			for (const child of existing) {
+				transitionCardOut(child, () => child.remove());
+			}
 			// Morph the particle field to the new woman's portrait; fail-open
 			summaryPromise
 				.then((s) => {
@@ -200,7 +184,7 @@ function init(game: HTMLElement): void {
 		dispatch({ type: "RESET" });
 		messageEl.textContent = "";
 		clearReject(input, form);
-		wall.replaceChildren();
+		clearWall(wall);
 		// mirror the idle→playing dock so the input glides back to center
 		dockInput(inputSlot, () => game.setAttribute("data-phase", "idle"));
 		input.focus();

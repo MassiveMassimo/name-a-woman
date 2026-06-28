@@ -7,55 +7,62 @@ const prefersReduced = (): boolean =>
 	typeof window !== "undefined" &&
 	window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// Snapshot existing card positions BEFORE the new card is inserted, for Flip reflow.
-export function captureCards(cards: Element[]): Flip.FlipState {
-	return Flip.getState(cards);
-}
-
-// New card launches from the input and flies up into the row (3D tilt + blur).
-export function flyCardIn(card: HTMLElement, input: HTMLElement): void {
+// New card enters from below: translate up + blur + fade in.
+export function transitionCardIn(card: HTMLElement): void {
 	if (prefersReduced()) {
-		gsap.fromTo(card, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.2 });
+		gsap.set(card, { autoAlpha: 1, y: 0, filter: "blur(0px)" });
 		return;
 	}
-	const nr = card.getBoundingClientRect();
-	const ir = input.getBoundingClientRect();
-	const dx = ir.left + ir.width / 2 - (nr.left + nr.width / 2);
-	const dy = ir.top + ir.height / 2 - (nr.top + nr.height / 2);
 	gsap.fromTo(
 		card,
+		{ y: 40, autoAlpha: 0, filter: "blur(12px)" },
 		{
-			x: dx,
-			y: dy,
-			scale: 0.42,
-			rotationX: -42,
-			skewY: 6,
-			autoAlpha: 0,
-			filter: "blur(12px)",
-			transformPerspective: 900,
-			transformOrigin: "center center",
-		},
-		{
-			x: 0,
 			y: 0,
-			scale: 1,
-			rotationX: 0,
-			skewY: 0,
 			autoAlpha: 1,
 			filter: "blur(0px)",
-			duration: 0.55,
+			duration: 0.6,
 			ease: "power3.out",
 		},
 	);
 }
 
-// Existing cards glide to their new slots; barely-there ripple from the insertion point.
-export function reflow(state: Flip.FlipState): void {
-	Flip.from(state, {
-		duration: 0.46,
-		ease: "power2.out",
-		stagger: prefersReduced() ? 0 : 0.015,
+// Old card exits upward: translate up + blur + fade out, then remove from DOM.
+export function transitionCardOut(
+	card: HTMLElement,
+	onRemove: () => void,
+): void {
+	gsap.killTweensOf(card);
+	if (prefersReduced()) {
+		onRemove();
+		return;
+	}
+	gsap.to(card, {
+		y: -40,
+		autoAlpha: 0,
+		filter: "blur(12px)",
+		duration: 0.5,
+		ease: "power3.in",
+		onComplete: onRemove,
 	});
+}
+
+// Blur-fade the extract text in once the Wikipedia summary resolves.
+export function revealExtract(el: HTMLElement): void {
+	if (prefersReduced()) {
+		gsap.set(el, { autoAlpha: 1, filter: "blur(0px)" });
+		return;
+	}
+	gsap.fromTo(
+		el,
+		{ autoAlpha: 0, filter: "blur(4px)" },
+		{ autoAlpha: 1, filter: "blur(0px)", duration: 0.5, ease: "power2.out" },
+	);
+}
+
+// Kill any in-flight card tweens and empty the wall (used on reset).
+export function clearWall(wall: HTMLElement): void {
+	gsap.killTweensOf(wall.children);
+	wall.replaceChildren();
 }
 
 // Big centered input → bottom dock. applyDocked flips the CSS class; Flip tweens between.
