@@ -48,6 +48,10 @@ export interface ParticleFieldOptions {
 	mouseRadius?: number;
 	/** Alignment of the particle cluster inside the canvas. */
 	align?: Align;
+	/** Fraction of the cluster width that fades to transparent on the left edge (0-1). */
+	leftFade?: number;
+	/** Fraction of the cluster height that fades to transparent at the bottom (0-1). */
+	bottomFade?: number;
 }
 
 export interface ParticleFieldHandle {
@@ -82,6 +86,8 @@ export function createParticleField(
 		mouseForce = 90,
 		mouseRadius = 110,
 		align = "right",
+		leftFade = 0.3,
+		bottomFade = 0.4,
 	} = options;
 
 	const ctx = canvas.getContext("2d", { alpha: true });
@@ -378,7 +384,19 @@ export function createParticleField(
 				const twinkle = reducedMotion
 					? 1
 					: 0.85 + Math.sin(time * 1.4 + p.phase) * 0.15;
-				ctx.globalAlpha = p.alpha * p.appear * twinkle;
+
+				// Edge fades relative to the cluster's actual bounds, not the canvas.
+				const clusterLeft = offsetX * dpr;
+				const clusterBottom = (offsetY + clusterH) * dpr;
+				const fadeW = clusterW * leftFade * dpr;
+				const fadeH = clusterH * bottomFade * dpr;
+				const leftFadeAlpha =
+					fadeW > 0 ? Math.min(1, (p.x - clusterLeft) / fadeW) : 1;
+				const bottomFadeAlpha =
+					fadeH > 0 ? Math.min(1, (clusterBottom - p.y) / fadeH) : 1;
+				const edgeFade = leftFadeAlpha * bottomFadeAlpha;
+
+				ctx.globalAlpha = p.alpha * p.appear * twinkle * edgeFade;
 				ctx.beginPath();
 				ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
 				ctx.fill();
