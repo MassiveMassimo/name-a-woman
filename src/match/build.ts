@@ -23,22 +23,27 @@ export function buildIndex(records: WomanRecord[]): MatchIndex {
 		// A form that equals the normalized title is marked primary even when it
 		// also appears among the aliases.
 		const nameForm = normalize(r.name);
-		const forms = new Set<string>();
-		if (nameForm) forms.add(nameForm);
-		for (const a of r.aliases) {
-			const form = normalize(a);
-			if (form) forms.add(form);
-		}
+		// form -> isSurnameOnly. A name/alias always wins over a surname tag, so a
+		// surname that coincides with a real alias keeps full prefix/fuzzy behavior.
+		const forms = new Map<string, boolean>();
+		const addForm = (f: string, surname: boolean) => {
+			if (!f) return;
+			if (!forms.has(f)) forms.set(f, surname);
+			else if (!surname) forms.set(f, false);
+		};
+		addForm(nameForm, false);
+		for (const a of r.aliases) addForm(normalize(a), false);
 		if (r.notability >= SURNAME_MIN_NOTABILITY) {
-			for (const s of surnameForms(r.name)) forms.add(s);
+			for (const s of surnameForms(r.name)) addForm(s, true);
 		}
-		for (const form of forms) {
+		for (const [form, surname] of forms) {
 			const key = bucketKey(form);
 			const entry: IndexEntry = {
 				form,
 				id: r.id,
 				notability: r.notability,
 				primary: form === nameForm,
+				surname,
 			};
 			const bucket = buckets.get(key);
 			if (bucket) bucket.push(entry);

@@ -10,6 +10,7 @@ export type IndexEntry = {
 	id: number;
 	notability: number;
 	primary: boolean; // form derives from the article title (vs an alias)
+	surname: boolean; // generated surname-only form: matched exactly, never by prefix/fuzzy
 };
 
 export type MatchIndex = {
