@@ -386,15 +386,20 @@ export function createParticleField(
 					: 0.85 + Math.sin(time * 1.4 + p.phase) * 0.15;
 
 				// Edge fades relative to the cluster's actual bounds, not the canvas.
-				const clusterLeft = offsetX * dpr;
-				const clusterBottom = (offsetY + clusterH) * dpr;
-				const fadeW = clusterW * leftFade * dpr;
-				const fadeH = clusterH * bottomFade * dpr;
-				const leftFadeAlpha =
-					fadeW > 0 ? Math.min(1, (p.x - clusterLeft) / fadeW) : 1;
-				const bottomFadeAlpha =
-					fadeH > 0 ? Math.min(1, (clusterBottom - p.y) / fadeH) : 1;
-				const edgeFade = leftFadeAlpha * bottomFadeAlpha;
+				// Left + bottom: soft gradient. Right + top: sharp cutoff so particles
+				// that bounce beyond the cluster during morphs/hover are hidden.
+				const cL = offsetX * dpr;
+				const cR = (offsetX + clusterW) * dpr;
+				const cT = offsetY * dpr;
+				const cB = (offsetY + clusterH) * dpr;
+				const fw = clusterW * leftFade * dpr;
+				const fh = clusterH * bottomFade * dpr;
+				const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+				const edgeFade =
+					clamp01((p.x - cL) / fw) *
+					clamp01((cR - p.x) / (fw * 0.15)) *
+					clamp01((cB - p.y) / fh) *
+					clamp01((p.y - cT) / (fh * 0.15));
 
 				ctx.globalAlpha = p.alpha * p.appear * twinkle * edgeFade;
 				ctx.beginPath();
