@@ -86,8 +86,8 @@ export function createParticleField(
 		mouseForce = 90,
 		mouseRadius = 110,
 		align = "right",
-		leftFade = 0.3,
-		bottomFade = 0.4,
+		leftFade = 0.45,
+		bottomFade = 0.5,
 	} = options;
 
 	const ctx = canvas.getContext("2d", { alpha: true });
