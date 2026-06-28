@@ -108,6 +108,8 @@ beforeEach(() => {
 	(globalThis as Record<string, unknown>).window = {
 		devicePixelRatio: 1,
 		matchMedia: globalThis.matchMedia,
+		addEventListener: () => {},
+		removeEventListener: () => {},
 	};
 
 	originals.devicePixelRatio = (

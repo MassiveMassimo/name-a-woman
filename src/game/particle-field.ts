@@ -42,6 +42,10 @@ export interface ParticleFieldOptions {
 	spring?: number;
 	/** Viscous damping on velocity. */
 	damping?: number;
+	/** How strong the cursor repels dots. */
+	mouseForce?: number;
+	/** Radius around the cursor that has repelling force, in device pixels. */
+	mouseRadius?: number;
 	/** Alignment of the particle cluster inside the canvas. */
 	align?: Align;
 }
@@ -75,6 +79,8 @@ export function createParticleField(
 		dotSize = 0.9,
 		spring = 0.035,
 		damping = 0.86,
+		mouseForce = 90,
+		mouseRadius = 110,
 		align = "right",
 	} = options;
 
@@ -104,6 +110,23 @@ export function createParticleField(
 	let currentImage: HTMLImageElement | null = null;
 	let loadToken = 0;
 	const reducedMotion = prefersReduced();
+
+	// Cursor repulsion — tracked via window pointer events (the canvas itself
+	// is pointer-events: none so clicks pass through to the game UI below).
+	const pointer = { x: -9999, y: -9999, active: false };
+	const onPointerMove = (e: PointerEvent) => {
+		const rect = canvas.getBoundingClientRect();
+		pointer.x = e.clientX - rect.left;
+		pointer.y = e.clientY - rect.top;
+		pointer.active = true;
+	};
+	const onPointerLeave = () => {
+		pointer.active = false;
+		pointer.x = -9999;
+		pointer.y = -9999;
+	};
+	window.addEventListener("pointermove", onPointerMove);
+	window.addEventListener("pointerleave", onPointerLeave);
 
 	// Dark-mode paint color (media-query based, not class based).
 	let fillColor = window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -322,6 +345,19 @@ export function createParticleField(
 					p.vx += dxo * s;
 					p.vy += dyo * s;
 
+					if (pointer.active) {
+						const dx = p.x - pointer.x * dpr;
+						const dy = p.y - pointer.y * dpr;
+						const d2 = dx * dx + dy * dy;
+						const mr = mouseRadius * dpr;
+						if (d2 < mr * mr && d2 > 0.0001) {
+							const d = Math.sqrt(d2);
+							const force = (1 - d / mr) * mouseForce;
+							p.vx += (dx / d) * force * 0.04;
+							p.vy += (dy / d) * force * 0.04;
+						}
+					}
+
 					const drift = Math.sin(time * 0.8 + p.phase) * 0.08;
 					p.vx += drift * 0.05;
 					p.vy += Math.cos(time * 0.9 + p.phase) * 0.04;
@@ -401,6 +437,8 @@ export function createParticleField(
 			if (resizeTimer) clearTimeout(resizeTimer);
 			ro.disconnect();
 			darkMq.removeEventListener("change", onDarkChange);
+			window.removeEventListener("pointermove", onPointerMove);
+			window.removeEventListener("pointerleave", onPointerLeave);
 			document.removeEventListener("visibilitychange", onVisibilityChange);
 		},
 		pause: () => {
