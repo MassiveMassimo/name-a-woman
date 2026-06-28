@@ -1,7 +1,7 @@
 // src/match/match.smash.test.ts
 // Keyboard-smash guard: a short query with no exact form that merely
 // strict-prefixes an obscure name must not leak a false match. Real partials
-// (>= PREFIX_MIN_LEN) and exact mononyms of any length still resolve.
+// (>= MIN_INEXACT_LEN) and exact mononyms of any length still resolve.
 import { expect, test } from "bun:test";
 import { buildIndex } from "./build";
 import { match } from "./match";
