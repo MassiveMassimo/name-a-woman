@@ -79,7 +79,7 @@ export function Game() {
 		}
 	}
 
-	function onSubmit(e: FormEvent) {
+	function onSubmit(e: FormEvent<HTMLFormElement>) {
 		e.preventDefault();
 		const el = inputRef.current;
 		if (!el || !index || state.phase === "over") return;
@@ -126,7 +126,7 @@ export function Game() {
 		<main
 			ref={containerRef}
 			data-phase="idle"
-			className="relative flex min-h-svh flex-col bg-slate-900 px-5 data-[phase=idle]:items-center data-[phase=idle]:justify-center sm:px-10 lg:px-20"
+			className="group relative flex min-h-svh flex-col bg-slate-900 px-5 data-[phase=idle]:items-center data-[phase=idle]:justify-center sm:px-10 lg:px-20"
 		>
 			{/* corner readouts */}
 			<div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-5 text-slate-400 text-sm">
@@ -146,7 +146,7 @@ export function Game() {
 			{/* card wall (top row) */}
 			<div
 				ref={wallRef}
-				className="flex flex-1 flex-row flex-nowrap items-center gap-3 overflow-x-auto pt-16 [perspective:900px] data-[phase=idle]:hidden"
+				className="flex flex-1 flex-row flex-nowrap items-center gap-3 overflow-x-auto pt-16 [perspective:900px] group-data-[phase=idle]:hidden"
 			>
 				{state.named.map((n) => (
 					<Card key={n.id} title={n.title} />
@@ -154,7 +154,10 @@ export function Game() {
 			</div>
 
 			{/* input */}
-			<form onSubmit={onSubmit} className="w-full data-[phase=playing]:pb-10">
+			<form
+				onSubmit={onSubmit}
+				className="w-full group-data-[phase=playing]:pb-10"
+			>
 				<input
 					ref={inputRef}
 					className={inputClass}
