@@ -7,84 +7,9 @@ const prefersReduced = (): boolean =>
 	typeof window !== "undefined" &&
 	window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// Title flies from the input position to its card position (Flip-style).
-// Measures the input rect + computed font-size, then animates the title
-// from there with a scale + blur so the text appears to travel and settle.
-export function flyTitleFromInput(
-	titleEl: HTMLElement,
-	input: HTMLElement,
-): void {
-	if (prefersReduced()) {
-		gsap.set(titleEl, {
-			autoAlpha: 1,
-			x: 0,
-			y: 0,
-			scale: 1,
-			filter: "blur(0px)",
-		});
-		return;
-	}
-	const inputRect = input.getBoundingClientRect();
-	const titleRect = titleEl.getBoundingClientRect();
-	const inputFs = parseFloat(getComputedStyle(input).fontSize);
-	const titleFs = parseFloat(getComputedStyle(titleEl).fontSize);
-	const dx = inputRect.left - titleRect.left;
-	const dy =
-		inputRect.top +
-		inputRect.height / 2 -
-		(titleRect.top + titleRect.height / 2);
-	const scale = inputFs / titleFs;
-	gsap.fromTo(
-		titleEl,
-		{ x: dx, y: dy, scale, autoAlpha: 1, filter: "blur(8px)" },
-		{
-			x: 0,
-			y: 0,
-			scale: 1,
-			autoAlpha: 1,
-			filter: "blur(0px)",
-			duration: 0.6,
-			ease: "power3.out",
-		},
-	);
-}
-
-// Old card exits upward: translate up + blur + fade out, then remove from DOM.
-export function transitionCardOut(
-	card: HTMLElement,
-	onRemove: () => void,
-): void {
-	gsap.killTweensOf(card);
-	if (prefersReduced()) {
-		onRemove();
-		return;
-	}
-	gsap.to(card, {
-		y: -40,
-		autoAlpha: 0,
-		filter: "blur(12px)",
-		duration: 0.5,
-		ease: "power3.in",
-		onComplete: onRemove,
-	});
-}
-
-// Blur-fade the extract text in once the Wikipedia summary resolves.
-export function revealExtract(el: HTMLElement): void {
-	if (prefersReduced()) {
-		gsap.set(el, { autoAlpha: 1, filter: "blur(0px)" });
-		return;
-	}
-	gsap.fromTo(
-		el,
-		{ autoAlpha: 0, filter: "blur(4px)" },
-		{ autoAlpha: 1, filter: "blur(0px)", duration: 0.5, ease: "power2.out" },
-	);
-}
-
-// Kill any in-flight card tweens and empty the wall (used on reset).
+// Empty the wall (used on reset). CSS transitions are cut when elements
+// are removed, so no tween killing needed.
 export function clearWall(wall: HTMLElement): void {
-	gsap.killTweensOf(wall.children);
 	wall.replaceChildren();
 }
 

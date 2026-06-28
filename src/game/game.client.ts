@@ -3,13 +3,10 @@ import {
 	clearReject,
 	clearWall,
 	dockInput,
-	flyTitleFromInput,
 	hideParticleField,
 	rejectShake,
-	revealExtract,
 	revealParticleField,
 	tickCounter,
-	transitionCardOut,
 } from "./animations";
 import { isDevMode } from "./dev";
 import { getCount, reportDiscovery } from "./global";
@@ -97,24 +94,36 @@ function init(game: HTMLElement): void {
 	}
 
 	// Build a single full-bleed card: large name (left-aligned) + first Wikipedia
-	// sentence. The name is synchronous; the extract blur-fades in on resolve.
+	// sentence. The name staggers in via t-stagger; the extract uses t-text-swap
+	// to crossfade from empty to the resolved Wikipedia text.
 	function buildCard(
 		title: string,
 		summaryPromise: Promise<Summary>,
 	): HTMLElement {
 		const card = document.createElement("div");
 		card.className =
-			"card absolute inset-0 flex items-center px-5 sm:px-10 lg:px-20";
+			"card t-stagger absolute inset-0 flex items-center px-5 sm:px-10 lg:px-20";
 		card.innerHTML = `
 			<div class="max-w-xl">
-				<h2 class="font-fraunces font-medium text-5xl leading-tight text-gray-900 sm:text-6xl dark:text-gray-100" data-title></h2>
-				<p class="mt-4 text-xl text-gray-600 sm:text-2xl dark:text-gray-400" data-extract></p>
+				<strong class="t-stagger-line t-stagger-line--1 font-fraunces font-medium text-5xl leading-tight text-gray-900 sm:text-6xl dark:text-gray-100" data-title></strong>
+				<span class="t-stagger-line t-stagger-line--2 mt-4 block text-xl text-gray-600 sm:text-2xl dark:text-gray-400">
+					<span class="t-text-swap" data-extract></span>
+				</span>
 			</div>`;
 		(card.querySelector("[data-title]") as HTMLElement).textContent = title;
 		const extractEl = card.querySelector("[data-extract]") as HTMLElement;
 		summaryPromise.then((s) => {
-			extractEl.textContent = s.extract ? firstSentence(s.extract) : "";
-			if (extractEl.textContent) revealExtract(extractEl);
+			const text = s.extract ? firstSentence(s.extract) : "";
+			if (!text) return;
+			// t-text-swap three-phase: exit empty, swap text, enter new
+			extractEl.classList.add("is-exit");
+			setTimeout(() => {
+				extractEl.textContent = text;
+				extractEl.classList.remove("is-exit");
+				extractEl.classList.add("is-enter-start");
+				void extractEl.offsetWidth; // force reflow
+				extractEl.classList.remove("is-enter-start");
+			}, 150); // --text-swap-dur
 		});
 		return card;
 	}
@@ -133,6 +142,7 @@ function init(game: HTMLElement): void {
 		if (!index || state.phase === "over") return;
 		const value = input.value.trim();
 		if (!value) return;
+		input.value = "";
 		messageEl.textContent = "";
 		clearReject(input, form); // drop any lingering reject before resolving
 
@@ -146,14 +156,14 @@ function init(game: HTMLElement): void {
 			// One summary fetch serves both the card content and the background field
 			const summaryPromise = fetchSummary(g.woman.name);
 			const card = buildCard(g.woman.name, summaryPromise);
-			// Crossfade: existing card(s) exit upward while the title flies from input
+			// Crossfade: existing card(s) fade out (is-hiding) while new card staggers in
 			const existing = [...wall.children] as HTMLElement[];
 			wall.appendChild(card);
-			const titleEl = card.querySelector("[data-title]") as HTMLElement;
-			flyTitleFromInput(titleEl, input);
-			input.value = ""; // clear after animation starts so text "jumps" to card
+			requestAnimationFrame(() => card.classList.add("is-shown"));
 			for (const child of existing) {
-				transitionCardOut(child, () => child.remove());
+				child.classList.remove("is-shown");
+				child.classList.add("is-hiding");
+				setTimeout(() => child.remove(), 200);
 			}
 			// Morph the particle field to the new woman's portrait; fail-open
 			summaryPromise
@@ -171,11 +181,9 @@ function init(game: HTMLElement): void {
 				.then((r) => setCount(r.count))
 				.catch(() => {});
 		} else if (g.kind === "ambiguous") {
-			input.value = "";
 			messageEl.textContent = "too common";
 			rejectShake(input, form);
 		} else if (g.kind === "none") {
-			input.value = "";
 			messageEl.textContent = "not found";
 			rejectShake(input, form);
 		}
