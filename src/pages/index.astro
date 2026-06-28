@@ -1,45 +1,8 @@
 ---
-import { Input } from "@/components/ui/input";
+import { Game } from "@/game/Game";
 import Layout from "../layouts/Layout.astro";
 ---
 
 <Layout title="Name a Woman">
-	<main
-		class="flex min-h-svh flex-col items-center justify-center bg-slate-100 px-5 sm:px-10 lg:px-40 dark:bg-slate-900"
-	>
-		<form id="search" class="w-full">
-			<Input
-				className="input h-auto w-full rounded-none border-x-0 border-t-0 border-b-4 bg-transparent text-4xl capitalize ring-0 ring-offset-transparent transition-colors duration-300 placeholder:normal-case placeholder:text-slate-300 focus-visible:border-slate-700 focus-visible:ring-0 focus-visible:ring-transparent focus-visible:placeholder:text-slate-400 sm:text-7xl lg:text-9xl"
-				type="text"
-				name="name"
-				placeholder="Name a woman"
-				autoComplete="off"
-			/>
-		</form>
-	</main>
+	<Game client:load />
 </Layout>
-
-<script>
-import { supabase } from "@/lib/supabase";
-
-const form = document.querySelector<HTMLFormElement>("#search");
-const input = form?.querySelector<HTMLInputElement>("input");
-
-form?.addEventListener("submit", async (event) => {
-	event.preventDefault();
-	const name = input?.value.trim();
-	if (!name) return;
-
-	// Fuzzy search backed by the `search_woman` Postgres function.
-	const { data, error } = await supabase.rpc("search_woman", {
-		input_name: name,
-	});
-	if (error) {
-		console.error("search_woman failed:", error);
-		return;
-	}
-
-	console.log(data);
-	if (input) input.value = "";
-});
-</script>
