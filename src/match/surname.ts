@@ -39,8 +39,14 @@ const PARTICLES = new Set([
 const MIN_SURNAME_LEN = 3;
 
 // Derive normalized surname forms from a full article title. Returns [] for
-// mononyms / single-token names. The particle-joined surname comes first, the
-// bare last token second when they differ.
+// mononyms / single-token names. A compound surname (when present) comes first,
+// the bare last token second:
+//   "Marie Curie"          -> ["curie"]
+//   "Simone de Beauvoir"   -> ["de beauvoir", "beauvoir"]   (nobiliary particle)
+//   "Ruth Bader Ginsburg"  -> ["bader ginsburg", "ginsburg"] (two-word surname)
+//   "Aung San Suu Kyi"     -> ["suu kyi", "kyi"]
+// Two-word surnames are commonly how a woman is referenced; a particle run takes
+// precedence over the bare two-word form, and initials ("J. K.") never start one.
 export function surnameForms(name: string): string[] {
 	const tokens = normalize(name).split(" ").filter(Boolean);
 	if (tokens.length < 2) return [];
@@ -49,6 +55,16 @@ export function surnameForms(name: string): string[] {
 	// Walk back over particles, but never consume the first (given-name) token.
 	let i = tokens.length - 2;
 	while (i >= 1 && PARTICLES.has(tokens[i])) i--;
-	const joined = tokens.slice(i + 1).join(" ");
-	return joined === last ? [last] : [joined, last];
+	const particleCompound = tokens.slice(i + 1).join(" ");
+	const prev = tokens[tokens.length - 2];
+	const prevIsInitial = prev.length === 1 || prev.endsWith(".");
+
+	const forms: string[] = [];
+	if (particleCompound !== last) {
+		forms.push(particleCompound);
+	} else if (tokens.length >= 3 && !prevIsInitial) {
+		forms.push(`${prev} ${last}`);
+	}
+	forms.push(last);
+	return forms;
 }

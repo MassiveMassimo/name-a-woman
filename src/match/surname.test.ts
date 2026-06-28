@@ -7,8 +7,15 @@ test("derives the last token as the surname", () => {
 	expect(surnameForms("Margaret Thatcher")).toEqual(["thatcher"]);
 });
 
-test("ignores middle names (surname is the trailing token only)", () => {
-	expect(surnameForms("Mary Jane Watson")).toEqual(["watson"]);
+test("emits a two-word surname plus the bare token", () => {
+	expect(surnameForms("Ruth Bader Ginsburg")).toEqual([
+		"bader ginsburg",
+		"ginsburg",
+	]);
+	expect(surnameForms("Aung San Suu Kyi")).toEqual(["suu kyi", "kyi"]);
+});
+
+test("does not start a two-word surname with an initial", () => {
 	expect(surnameForms("J. K. Rowling")).toEqual(["rowling"]);
 });
 
