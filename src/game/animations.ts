@@ -71,6 +71,7 @@ export function dockInput(input: HTMLElement, applyDocked: () => void): void {
 
 export function rejectShake(input: HTMLElement): void {
 	if (prefersReduced()) return;
+	gsap.killTweensOf(input); // avoid mid-flight snap on a rapid second reject
 	gsap.fromTo(
 		input,
 		{ x: -7 },

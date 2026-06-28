@@ -35,6 +35,7 @@ export function Game() {
 	const counterRef = useRef<HTMLSpanElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const pendingFlip = useRef<ReturnType<typeof captureCards> | null>(null);
+	const prevCount = useRef(0);
 	const dev = useRef(
 		isDevMode(typeof window !== "undefined" ? window.location.search : ""),
 	).current;
@@ -44,9 +45,11 @@ export function Game() {
 		getCount().then(setCount);
 	}, []);
 
-	// animate the counter readout when it changes
+	// animate the counter readout from its previous value to the new one
 	useEffect(() => {
-		if (counterRef.current) tickCounter(counterRef.current, 0, count);
+		if (counterRef.current)
+			tickCounter(counterRef.current, prevCount.current, count);
+		prevCount.current = count;
 	}, [count]);
 
 	// timer: tick each second while playing (disabled in dev mode)
