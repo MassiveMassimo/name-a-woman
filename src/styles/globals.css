@@ -140,6 +140,6 @@
 
 /* Size-match Fraunces to Marlin (smaller x-height) and crank WONK to max. */
 .fake-placeholder .font-fraunces {
-	font-size: 1.1em;
+	font-size: 1.2em;
 	font-variation-settings: "WONK" 1;
 }
