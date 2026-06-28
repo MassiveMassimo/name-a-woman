@@ -1,9 +1,17 @@
 import { normalize } from "./normalize";
+import { surnameForms } from "./surname";
 import type { IndexEntry, MatchIndex, WomanRecord } from "./types";
 
 export function bucketKey(form: string): string {
 	return form.length === 0 ? "" : form[0];
 }
+
+// Surname-only forms ("rowling", "curie") are generated only for women notable
+// enough to be recalled by surname alone. Surname recall is inherently a
+// famous-woman gesture; gating here keeps the index ~10% leaner and stops obscure
+// word-surnames from making random words typable. Resolution among same-surname
+// bearers is left to match()'s dominance/ambiguity logic.
+export const SURNAME_MIN_NOTABILITY = 10;
 
 export function buildIndex(records: WomanRecord[]): MatchIndex {
 	const byId = new Map<number, WomanRecord>();
@@ -20,6 +28,9 @@ export function buildIndex(records: WomanRecord[]): MatchIndex {
 		for (const a of r.aliases) {
 			const form = normalize(a);
 			if (form) forms.add(form);
+		}
+		if (r.notability >= SURNAME_MIN_NOTABILITY) {
+			for (const s of surnameForms(r.name)) forms.add(s);
 		}
 		for (const form of forms) {
 			const key = bucketKey(form);
