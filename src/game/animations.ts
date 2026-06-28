@@ -59,12 +59,12 @@ export function reflow(state: Flip.FlipState): void {
 }
 
 // Big centered input → bottom dock. applyDocked flips the CSS class; Flip tweens between.
-export function dockInput(input: HTMLElement, applyDocked: () => void): void {
+export function dockInput(target: HTMLElement, applyDocked: () => void): void {
 	if (prefersReduced()) {
 		applyDocked();
 		return;
 	}
-	const state = Flip.getState(input);
+	const state = Flip.getState(target);
 	applyDocked();
 	Flip.from(state, { duration: 0.5, ease: "power3.out" });
 }

@@ -36,6 +36,7 @@ function init(game: HTMLElement): void {
 	const wall = $<HTMLDivElement>("wall");
 	const form = $<HTMLFormElement>("form");
 	const input = $<HTMLInputElement>("input");
+	const inputSlot = $<HTMLDivElement>("input-slot");
 	const messageEl = $("message");
 	const overEl = $("over");
 	const finalEl = $("final");
@@ -139,7 +140,7 @@ function init(game: HTMLElement): void {
 	// first keystroke starts the round and docks the input to the bottom
 	input.addEventListener("input", () => {
 		if (state.phase === "idle" && input.value.length > 0) {
-			dockInput(input, () => game.setAttribute("data-phase", "playing"));
+			dockInput(inputSlot, () => game.setAttribute("data-phase", "playing"));
 			dispatch({ type: "START" });
 			startTimer();
 		}
@@ -201,7 +202,7 @@ function init(game: HTMLElement): void {
 		clearReject(input, form);
 		wall.replaceChildren();
 		// mirror the idle→playing dock so the input glides back to center
-		dockInput(input, () => game.setAttribute("data-phase", "idle"));
+		dockInput(inputSlot, () => game.setAttribute("data-phase", "idle"));
 		input.focus();
 		// fade the particle field out; reset so the next correct guess re-reveals
 		if (bgCanvas) {

@@ -7,6 +7,7 @@
 	--font-sans:
 		"Marlin Soft SQ Regular", ui-sans-serif, system-ui, sans-serif,
 		"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+	--font-fraunces: "Fraunces", serif;
 }
 
 * {
@@ -199,4 +200,24 @@
 }
 .t-input-wrap.is-error .t-error-msg {
 	@apply text-rose-500 dark:text-rose-400;
+}
+
+/* Fake placeholder — per-word styling the native ::placeholder can't do.
+   The native placeholder is transparent; this overlay shows only while
+   the input is empty (:placeholder-shown) with "woman" in Fraunces italic. */
+.fake-placeholder {
+	display: none;
+	color: var(--color-gray-400);
+	transition: color 150ms ease-out;
+}
+.t-input:placeholder-shown + .fake-placeholder {
+	display: block;
+}
+.t-input:placeholder-shown:focus + .fake-placeholder {
+	color: var(--color-gray-500);
+}
+@media (prefers-color-scheme: dark) {
+	.fake-placeholder {
+		color: var(--color-gray-600);
+	}
 }
