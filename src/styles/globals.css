@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (@media (prefers-color-scheme: dark));
 
 @theme {
 	--font-sans:
@@ -34,4 +34,169 @@
 	font-weight: 500;
 	font-style: normal;
 	font-display: swap;
+}
+
+/* Transitions.dev — Skeleton loader and reveal (card data load) */
+
+:root {
+	--pulse-dur: 1000ms;
+	--pulse-count: infinite; /* loader: pulse until .is-revealed */
+	--pulse-min: 0.5;
+	--reveal-dur: 400ms;
+	--reveal-blur: 2px;
+	--reveal-ease: ease-in-out;
+}
+
+/* The wrap stacks two layers on the same coordinates. The
+   skeleton owns the cold pulse + the fade-out side of the
+   reveal; the content owns the fade-in side. They share the
+   same duration / ease so the swap reads as one motion. */
+.t-skel {
+	position: relative;
+}
+.t-skel-skeleton,
+.t-skel-content {
+	position: absolute;
+	inset: 0;
+}
+
+.t-skel-skeleton {
+	z-index: 1;
+	opacity: 1;
+	filter: blur(0);
+	transition:
+		opacity var(--reveal-dur) var(--reveal-ease),
+		filter var(--reveal-dur) var(--reveal-ease);
+}
+.t-skel-content {
+	z-index: 2;
+	opacity: 0;
+	filter: blur(var(--reveal-blur));
+	transition:
+		opacity var(--reveal-dur) var(--reveal-ease),
+		filter var(--reveal-dur) var(--reveal-ease);
+}
+.t-skel.is-revealed .t-skel-skeleton {
+	opacity: 0;
+	filter: blur(var(--reveal-blur));
+}
+.t-skel.is-revealed .t-skel-content {
+	opacity: 1;
+	filter: blur(0);
+}
+.t-skel.is-resetting .t-skel-skeleton,
+.t-skel.is-resetting .t-skel-content {
+	transition: none;
+}
+
+/* Pulse: place the animation on the bar/avatar children, not
+   on the skeleton itself, so the skeleton's opacity / filter
+   stay free for the cross-fade transition above. */
+.t-skel-skeleton.is-pulsing > * {
+	animation: t-skel-pulse var(--pulse-dur) ease-in-out var(--pulse-count);
+}
+/* stop the (infinite) pulse once revealed so hidden skeletons don't keep
+   animating during play */
+.t-skel.is-revealed .t-skel-skeleton.is-pulsing > * {
+	animation: none;
+}
+@keyframes t-skel-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: var(--pulse-min);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.t-skel-skeleton,
+	.t-skel-content {
+		transition: none;
+	}
+	.t-skel-skeleton.is-pulsing > * {
+		animation: none;
+	}
+}
+
+/* Transitions.dev — Error state shake (guess rejected) */
+
+:root {
+	--shake-distance: 6px;
+	--shake-overshoot: 4px;
+	--shake-dur-a: 80ms;
+	--shake-dur-b: 60ms;
+	--shake-ease: cubic-bezier(0.22, 1, 0.36, 1);
+	--revert-hold: 3000ms;
+	--revert-dur: 280ms;
+}
+
+/* Border-color tween. Component CSS owns the colors below;
+   this rule only owns the interpolation. */
+.t-input {
+	transition: border-color 150ms ease-out;
+	will-change: transform;
+}
+.t-input.is-error {
+	transition: border-color var(--revert-dur, 280ms) ease-out;
+}
+
+.t-error-msg {
+	opacity: 0;
+	visibility: hidden;
+	transition:
+		opacity var(--revert-dur, 280ms) ease-out,
+		visibility 0s linear var(--revert-dur, 280ms);
+}
+.t-input-wrap.is-error .t-error-msg {
+	opacity: 1;
+	visibility: visible;
+	transition:
+		opacity var(--revert-dur, 280ms) ease-out,
+		visibility 0s linear 0s;
+}
+
+.t-input.is-shaking {
+	animation: t-input-shake calc(var(--shake-dur-a) * 2 + var(--shake-dur-b) * 2)
+		linear;
+}
+@keyframes t-input-shake {
+	0% {
+		transform: translateX(0);
+		animation-timing-function: var(--shake-ease);
+	}
+	28.57% {
+		transform: translateX(var(--shake-distance));
+		animation-timing-function: var(--shake-ease);
+	}
+	57.14% {
+		transform: translateX(calc(var(--shake-distance) * -1));
+		animation-timing-function: var(--shake-ease);
+	}
+	78.57% {
+		transform: translateX(var(--shake-overshoot));
+		animation-timing-function: var(--shake-ease);
+	}
+	100% {
+		transform: translateX(0);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	/* match .t-input.is-shaking specificity so the shake is actually suppressed */
+	.t-input.is-shaking {
+		animation: none;
+	}
+	.t-input {
+		transform: none;
+	}
+}
+
+/* Reject colors — follow the same dark: mechanism as the rest of the app. */
+.t-input.is-error {
+	@apply border-rose-500 dark:border-rose-400;
+}
+.t-input-wrap.is-error .t-error-msg {
+	@apply text-rose-500 dark:text-rose-400;
 }

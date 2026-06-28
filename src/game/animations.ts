@@ -69,14 +69,24 @@ export function dockInput(input: HTMLElement, applyDocked: () => void): void {
 	Flip.from(state, { duration: 0.5, ease: "power3.out" });
 }
 
-export function rejectShake(input: HTMLElement): void {
-	if (prefersReduced()) return;
-	gsap.killTweensOf(input); // avoid mid-flight snap on a rapid second reject
-	gsap.fromTo(
-		input,
-		{ x: -7 },
-		{ x: 0, duration: 0.16, ease: "elastic.out(1,0.4)" },
-	);
+// CSS-driven reject (transitions.dev error-state-shake): shake the input,
+// flag the wrap so the error message reveals, then auto-revert after the hold.
+// Reduced-motion is handled in CSS (shake suppressed, message still shows).
+let rejectTimer: ReturnType<typeof setTimeout> | undefined;
+
+export function rejectShake(input: HTMLElement, wrap: HTMLElement): void {
+	input.classList.remove("is-shaking");
+	void input.offsetWidth; // reflow so a rapid second reject replays the shake
+	wrap.classList.add("is-error");
+	input.classList.add("is-error", "is-shaking");
+	clearTimeout(rejectTimer);
+	rejectTimer = setTimeout(() => clearReject(input, wrap), 3000); // --revert-hold
+}
+
+export function clearReject(input: HTMLElement, wrap: HTMLElement): void {
+	clearTimeout(rejectTimer);
+	wrap.classList.remove("is-error");
+	input.classList.remove("is-error");
 }
 
 // Animate the global counter readout from one value to the next.
