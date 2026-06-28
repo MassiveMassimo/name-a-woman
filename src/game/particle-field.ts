@@ -183,7 +183,13 @@ export function createParticleField(
 		const offCtx = off.getContext("2d", { willReadFrequently: true });
 		if (!offCtx) return [];
 		offCtx.drawImage(image, 0, 0, sw, sh);
-		const data = offCtx.getImageData(0, 0, sw, sh).data;
+		let data: Uint8ClampedArray;
+		try {
+			data = offCtx.getImageData(0, 0, sw, sh).data;
+		} catch {
+			// Tainted canvas (CORS failure) — degrade silently, keep previous figure.
+			return [];
+		}
 
 		const cellW = drawW / sw;
 		const cellH = drawH / sh;
@@ -342,6 +348,20 @@ export function createParticleField(
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
 			ctx.fillStyle = fillColor;
 
+			// Edge fades relative to the cluster's actual bounds, not the canvas.
+			// Left + bottom: soft gradient. Right + top: sharp cutoff so particles
+			// that bounce beyond the cluster during morphs/hover are hidden.
+			const cL = offsetX * dpr;
+			const cR = (offsetX + clusterW) * dpr;
+			const cT = offsetY * dpr;
+			const cB = (offsetY + clusterH) * dpr;
+			const fw = clusterW * leftFade * dpr;
+			const fh = clusterH * bottomFade * dpr;
+			// Right/top cutoff: fixed 7% of cluster, decoupled from left/bottom fade.
+			const cutoffW = clusterW * 0.07 * dpr;
+			const cutoffH = clusterH * 0.07 * dpr;
+			const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+
 			let writeIdx = 0;
 			for (let i = 0; i < particles.length; i++) {
 				const p = particles[i];
@@ -388,18 +408,11 @@ export function createParticleField(
 				// Edge fades relative to the cluster's actual bounds, not the canvas.
 				// Left + bottom: soft gradient. Right + top: sharp cutoff so particles
 				// that bounce beyond the cluster during morphs/hover are hidden.
-				const cL = offsetX * dpr;
-				const cR = (offsetX + clusterW) * dpr;
-				const cT = offsetY * dpr;
-				const cB = (offsetY + clusterH) * dpr;
-				const fw = clusterW * leftFade * dpr;
-				const fh = clusterH * bottomFade * dpr;
-				const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 				const edgeFade =
 					clamp01((p.x - cL) / fw) *
-					clamp01((cR - p.x) / (fw * 0.15)) *
+					clamp01((cR - p.x) / cutoffW) *
 					clamp01((cB - p.y) / fh) *
-					clamp01((p.y - cT) / (fh * 0.15));
+					clamp01((p.y - cT) / cutoffH);
 
 				ctx.globalAlpha = p.alpha * p.appear * twinkle * edgeFade;
 				ctx.beginPath();
@@ -468,9 +481,14 @@ export function createParticleField(
 		},
 		pause: () => {
 			paused = true;
+			if (rafId) {
+				cancelAnimationFrame(rafId);
+				rafId = 0;
+			}
 		},
 		resume: () => {
 			paused = false;
+			if (!rafId && !destroyed) rafId = requestAnimationFrame(render);
 		},
 	};
 }
