@@ -38,14 +38,14 @@ export interface ParticleFieldOptions {
 	renderScale?: number;
 	/** Base dot size in device pixels. */
 	dotSize?: number;
-	/** Spring constant pulling dots back to their origin. */
-	spring?: number;
-	/** Viscous damping on velocity. */
-	damping?: number;
+	/** Per-frame lerp factor pulling dots toward their origin (0-1). */
+	approach?: number;
 	/** How strong the cursor repels dots. */
 	mouseForce?: number;
 	/** Radius around the cursor that has repelling force, in device pixels. */
 	mouseRadius?: number;
+	/** Radius of the image-reveal lens at the cursor, in CSS pixels. */
+	lensRadius?: number;
 	/** Alignment of the particle cluster inside the canvas. */
 	align?: Align;
 	/** Fraction of the cluster width that fades to transparent on the left edge (0-1). */
@@ -81,10 +81,10 @@ export function createParticleField(
 		threshold = 45,
 		renderScale = 1,
 		dotSize = 0.9,
-		spring = 0.035,
-		damping = 0.86,
-		mouseForce = 90,
-		mouseRadius = 110,
+		approach = 0.1,
+		mouseForce = 30,
+		mouseRadius = 165,
+		lensRadius = 150,
 		align = "right",
 		leftFade = 0.45,
 		bottomFade = 0.5,
@@ -115,6 +115,10 @@ export function createParticleField(
 	let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 	let currentImage: HTMLImageElement | null = null;
 	let loadToken = 0;
+	let lensCanvas: HTMLCanvasElement | null = null;
+	let lensCtx: CanvasRenderingContext2D | null = null;
+	let lensW = 0;
+	let lensH = 0;
 	const reducedMotion = prefersReduced();
 
 	// Cursor repulsion — tracked via window pointer events (the canvas itself
@@ -307,12 +311,12 @@ export function createParticleField(
 			p.alpha = t.alpha;
 			p.fading = false;
 			p.springJitter = randomSpringJitter();
-			// Reset position for reduced-motion so the figure snaps, not springs.
+			p.vx = 0;
+			p.vy = 0;
+			// Reset position for reduced-motion so the figure snaps, not eases.
 			if (reducedMotion) {
 				p.x = t.ox;
 				p.y = t.oy;
-				p.vx = 0;
-				p.vy = 0;
 			}
 		}
 
@@ -369,9 +373,9 @@ export function createParticleField(
 				if (!reducedMotion) {
 					const dxo = p.ox - p.x;
 					const dyo = p.oy - p.y;
-					const s = spring * p.springJitter;
-					p.vx += dxo * s;
-					p.vy += dyo * s;
+					const rate = approach * p.springJitter;
+					p.x += dxo * rate;
+					p.y += dyo * rate;
 
 					if (pointer.active) {
 						const dx = p.x - pointer.x * dpr;
@@ -386,14 +390,13 @@ export function createParticleField(
 						}
 					}
 
-					const drift = Math.sin(time * 0.8 + p.phase) * 0.08;
-					p.vx += drift * 0.05;
-					p.vy += Math.cos(time * 0.9 + p.phase) * 0.04;
-
-					p.vx *= damping;
-					p.vy *= damping;
+					p.vx *= 0.9;
+					p.vy *= 0.9;
 					p.x += p.vx;
 					p.y += p.vy;
+
+					p.x += Math.sin(time * 0.8 + p.phase) * 0.004;
+					p.y += Math.cos(time * 0.9 + p.phase) * 0.003;
 				}
 
 				const appearTarget = p.fading ? 0 : 1;
@@ -424,6 +427,79 @@ export function createParticleField(
 			}
 			if (writeIdx !== particles.length) particles.length = writeIdx;
 			ctx.globalAlpha = 1;
+
+			// Image-reveal lens: draw the real colored photo through a soft
+			// spotlight gradient at the cursor. Edge fades are applied so the
+			// lens respects the left/bottom cluster masks.
+			if (pointer.active && currentImage?.width) {
+				if (!lensCanvas) {
+					lensCanvas = document.createElement("canvas");
+					lensCtx = lensCanvas.getContext("2d");
+				}
+				if (lensCtx) {
+					if (lensW !== canvas.width || lensH !== canvas.height) {
+						lensCanvas.width = canvas.width;
+						lensCanvas.height = canvas.height;
+						lensW = canvas.width;
+						lensH = canvas.height;
+					}
+					lensCtx.clearRect(0, 0, lensCanvas.width, lensCanvas.height);
+
+					// Draw the image at its contain-fit position
+					lensCtx.drawImage(
+						currentImage,
+						offsetX * dpr,
+						offsetY * dpr,
+						clusterW * dpr,
+						clusterH * dpr,
+					);
+
+					// Erase edges with destination-out gradient strips
+					lensCtx.globalCompositeOperation = "destination-out";
+					// Left fade
+					const lg = lensCtx.createLinearGradient(cL, 0, cL + fw, 0);
+					lg.addColorStop(0, "rgba(0,0,0,1)");
+					lg.addColorStop(1, "rgba(0,0,0,0)");
+					lensCtx.fillStyle = lg;
+					lensCtx.fillRect(cL, 0, fw, lensCanvas.height);
+					// Right cutoff
+					const rg = lensCtx.createLinearGradient(cR - cutoffW, 0, cR, 0);
+					rg.addColorStop(0, "rgba(0,0,0,0)");
+					rg.addColorStop(1, "rgba(0,0,0,1)");
+					lensCtx.fillStyle = rg;
+					lensCtx.fillRect(cR - cutoffW, 0, cutoffW, lensCanvas.height);
+					// Bottom fade
+					const bg = lensCtx.createLinearGradient(0, cB - fh, 0, cB);
+					bg.addColorStop(0, "rgba(0,0,0,0)");
+					bg.addColorStop(1, "rgba(0,0,0,1)");
+					lensCtx.fillStyle = bg;
+					lensCtx.fillRect(0, cB - fh, lensCanvas.width, fh);
+					// Top cutoff
+					const tg = lensCtx.createLinearGradient(0, cT, 0, cT + cutoffH);
+					tg.addColorStop(0, "rgba(0,0,0,1)");
+					tg.addColorStop(1, "rgba(0,0,0,0)");
+					lensCtx.fillStyle = tg;
+					lensCtx.fillRect(0, cT, lensCanvas.width, cutoffH);
+
+					// Apply the spotlight gradient mask (keep only under the cursor)
+					lensCtx.globalCompositeOperation = "destination-in";
+					const px = pointer.x * dpr;
+					const py = pointer.y * dpr;
+					const r = lensRadius * dpr;
+					const grad = lensCtx.createRadialGradient(px, py, 0, px, py, r);
+					grad.addColorStop(0, "rgba(255,255,255,1)");
+					grad.addColorStop(0.3, "rgba(255,255,255,1)");
+					grad.addColorStop(0.7, "rgba(255,255,255,0.3)");
+					grad.addColorStop(1, "rgba(255,255,255,0)");
+					lensCtx.fillStyle = grad;
+					lensCtx.fillRect(0, 0, lensCanvas.width, lensCanvas.height);
+					lensCtx.globalCompositeOperation = "source-over";
+
+					ctx.globalAlpha = 0.6;
+					ctx.drawImage(lensCanvas, 0, 0);
+					ctx.globalAlpha = 1;
+				}
+			}
 		}
 		rafId = requestAnimationFrame(render);
 	};
@@ -478,6 +554,8 @@ export function createParticleField(
 			window.removeEventListener("pointermove", onPointerMove);
 			window.removeEventListener("pointerleave", onPointerLeave);
 			document.removeEventListener("visibilitychange", onVisibilityChange);
+			lensCanvas = null;
+			lensCtx = null;
 		},
 		pause: () => {
 			paused = true;

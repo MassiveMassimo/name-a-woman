@@ -88,9 +88,11 @@ function init(game: HTMLElement): void {
 	}
 
 	// Extract the first sentence from a Wikipedia extract string.
+	// Matches sentence terminators only when followed by a capital letter
+	// to avoid truncating on abbreviations like "St." or "D.C.".
 	function firstSentence(text: string): string {
-		const idx = text.search(/[.!?]\s/);
-		return idx >= 0 ? text.slice(0, idx + 1) : text;
+		const m = text.match(/[.!?]\s+[A-Z]/);
+		return m?.index !== undefined ? text.slice(0, m.index + 1) : text;
 	}
 
 	// Build a single full-bleed card: large name (left-aligned) + first Wikipedia
@@ -113,11 +115,13 @@ function init(game: HTMLElement): void {
 		(card.querySelector("[data-title]") as HTMLElement).textContent = title;
 		const extractEl = card.querySelector("[data-extract]") as HTMLElement;
 		summaryPromise.then((s) => {
+			if (!card.isConnected) return;
 			const text = s.extract ? firstSentence(s.extract) : "";
 			if (!text) return;
 			// t-text-swap three-phase: exit empty, swap text, enter new
 			extractEl.classList.add("is-exit");
 			setTimeout(() => {
+				if (!card.isConnected) return;
 				extractEl.textContent = text;
 				extractEl.classList.remove("is-exit");
 				extractEl.classList.add("is-enter-start");
@@ -156,13 +160,14 @@ function init(game: HTMLElement): void {
 			// One summary fetch serves both the card content and the background field
 			const summaryPromise = fetchSummary(g.woman.name);
 			const card = buildCard(g.woman.name, summaryPromise);
-			// Crossfade: existing card(s) fade out (is-hiding) while new card staggers in
+			// Crossfade: existing card(s) exit on top while new card staggers in beneath
 			const existing = [...wall.children] as HTMLElement[];
 			wall.appendChild(card);
 			requestAnimationFrame(() => card.classList.add("is-shown"));
 			for (const child of existing) {
-				child.classList.remove("is-shown");
+				child.style.zIndex = "1";
 				child.classList.add("is-hiding");
+				child.classList.remove("is-shown");
 				setTimeout(() => child.remove(), 200);
 			}
 			// Morph the particle field to the new woman's portrait; fail-open
@@ -186,8 +191,10 @@ function init(game: HTMLElement): void {
 		} else if (g.kind === "none") {
 			messageEl.textContent = "not found";
 			rejectShake(input, form);
+		} else if (g.kind === "duplicate") {
+			messageEl.textContent = "already named";
+			rejectShake(input, form);
 		}
-		// duplicate: soft no-op
 	});
 
 	again.addEventListener("click", () => {

@@ -69,12 +69,12 @@
 }
 .t-stagger.is-hiding .t-stagger-line {
 	opacity: 0;
-	transform: translateY(0);
-	filter: blur(0);
+	transform: translateY(calc(var(--text-swap-translate-y) * -1));
+	filter: blur(var(--text-swap-blur));
 	transition:
 		opacity 200ms ease,
-		transform 0s linear,
-		filter 0s linear;
+		transform 200ms ease,
+		filter 200ms ease;
 	transition-delay: 0s;
 }
 

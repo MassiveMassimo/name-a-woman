@@ -66,7 +66,7 @@ export function hideParticleField(canvas: HTMLCanvasElement): void {
 	gsap.to(canvas, {
 		opacity: 0,
 		filter: "blur(24px)",
-		duration: 0.6,
+		duration: 0.3,
 		ease: "power2.in",
 	});
 }
