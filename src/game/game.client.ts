@@ -4,6 +4,7 @@ import {
 	clearReject,
 	dockInput,
 	flyCardIn,
+	hideParticleField,
 	reflow,
 	rejectShake,
 	revealParticleField,
@@ -202,6 +203,11 @@ function init(game: HTMLElement): void {
 		// mirror the idle→playing dock so the input glides back to center
 		dockInput(input, () => game.setAttribute("data-phase", "idle"));
 		input.focus();
+		// fade the particle field out; reset so the next correct guess re-reveals
+		if (bgCanvas) {
+			hideParticleField(bgCanvas);
+			fieldRevealed = false;
+		}
 	});
 
 	// load the index, then enable play; readout fades in to avoid a 0-of-0 flash

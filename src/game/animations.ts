@@ -102,6 +102,20 @@ export function revealParticleField(canvas: HTMLCanvasElement): void {
 	);
 }
 
+// Hide the particle-field canvas with a blur-fade-out (inverse of reveal).
+export function hideParticleField(canvas: HTMLCanvasElement): void {
+	if (prefersReduced()) {
+		gsap.set(canvas, { opacity: 0, filter: "blur(24px)" });
+		return;
+	}
+	gsap.to(canvas, {
+		opacity: 0,
+		filter: "blur(24px)",
+		duration: 0.6,
+		ease: "power2.in",
+	});
+}
+
 // Animate the global counter readout from one value to the next.
 export function tickCounter(el: HTMLElement, from: number, to: number): void {
 	const obj = { v: from };
