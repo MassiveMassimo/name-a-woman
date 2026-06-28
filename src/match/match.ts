@@ -2,6 +2,7 @@
 import uFuzzy from "@leeoniya/ufuzzy";
 import { bucketKey } from "./build";
 import { normalize } from "./normalize";
+import { phoneticKey } from "./phonetic";
 import type { IndexEntry, MatchIndex, WomanRecord } from "./types";
 
 // Notability margin for an exact article-title collision (two distinct women
@@ -92,25 +93,43 @@ export function match(input: string, index: MatchIndex): MatchResult {
 
 	// 2. Judge the field the query exactly-aliases or prefixes. A true mononym
 	//    ("cher", "megawati") has one dominant bearer; a bare common first name
-	//    spreads across many comparably-notable women → too common.
+	//    spreads across many comparably-notable women → too common. Surname-only
+	//    forms are exact anchors: they join the field only on an exact hit, never
+	//    by prefix, so a common word that merely begins a surname ("planet" →
+	//    "planeta") does not leak.
 	if (inexactOk || bucket.some((e) => e.form === q)) {
-		const field = bucket.filter((e) => e.form.startsWith(q));
+		const field = bucket.filter((e) =>
+			e.surname ? e.form === q : e.form.startsWith(q),
+		);
 		if (field.length > 0) return decide(index, topByWoman(field), DOMINANCE);
 	}
 
-	// 3. A single-edit fuzzy pass for typos — inexact, so floored. uFuzzy can
-	//    match the query as a fragment buried inside a longer name (e.g. "asdfg"
-	//    inside "alexis penny casdagli"), so keep only whole-name typos — length
-	//    within the query's term count ("ada lovelce" → "ada lovelace").
+	// 3. A single-edit fuzzy pass for typos — inexact, so floored. Surnames are
+	//    excluded (a common word one edit from a surname, "random" → "randon", is
+	//    not a guess). uFuzzy can match the query as a fragment buried inside a
+	//    longer name (e.g. "asdfg" inside "alexis penny casdagli"), so keep only
+	//    whole-name typos — length within the query's term count ("ada lovelce" →
+	//    "ada lovelace").
 	if (!inexactOk) return { status: "none" };
-	const forms = bucket.map((e) => e.form);
+	const fuzzable = bucket.filter((e) => !e.surname);
+	const forms = fuzzable.map((e) => e.form);
 	const idxs = uf.filter(forms, q);
 	if (idxs && idxs.length > 0) {
 		const maxLenDiff = q.split(" ").length;
 		const fuzzy = idxs
-			.map((i) => bucket[i])
+			.map((i) => fuzzable[i])
 			.filter((e) => Math.abs(e.form.length - q.length) <= maxLenDiff);
 		if (fuzzy.length > 0) return decide(index, topByWoman(fuzzy), DOMINANCE);
+	}
+
+	// 4. Phonetic last resort: a full-name guess misspelled across a
+	//    sound-preserving boundary fuzzy can't bridge ("catherine hepburn" →
+	//    Katharine Hepburn). Multi-token only (phoneticKey returns "" otherwise),
+	//    notable bearers only, so it stays precise.
+	const pk = phoneticKey(q);
+	if (pk) {
+		const bearers = index.phonetic.get(pk);
+		if (bearers) return decide(index, topByWoman(bearers), DOMINANCE);
 	}
 
 	return { status: "none" };

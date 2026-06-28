@@ -10,9 +10,12 @@ export type IndexEntry = {
 	id: number;
 	notability: number;
 	primary: boolean; // form derives from the article title (vs an alias)
+	surname: boolean; // generated surname-only form: matched exactly, never by prefix/fuzzy
 };
 
 export type MatchIndex = {
 	byId: Map<number, WomanRecord>;
 	buckets: Map<string, IndexEntry[]>;
+	// Phonetic-key → notable bearers, for the last-resort phonetic stage.
+	phonetic: Map<string, IndexEntry[]>;
 };
