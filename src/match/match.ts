@@ -2,6 +2,7 @@
 import uFuzzy from "@leeoniya/ufuzzy";
 import { bucketKey } from "./build";
 import { normalize } from "./normalize";
+import { phoneticKey } from "./phonetic";
 import type { IndexEntry, MatchIndex, WomanRecord } from "./types";
 
 // Notability margin for an exact article-title collision (two distinct women
@@ -119,6 +120,16 @@ export function match(input: string, index: MatchIndex): MatchResult {
 			.map((i) => fuzzable[i])
 			.filter((e) => Math.abs(e.form.length - q.length) <= maxLenDiff);
 		if (fuzzy.length > 0) return decide(index, topByWoman(fuzzy), DOMINANCE);
+	}
+
+	// 4. Phonetic last resort: a full-name guess misspelled across a
+	//    sound-preserving boundary fuzzy can't bridge ("catherine hepburn" →
+	//    Katharine Hepburn). Multi-token only (phoneticKey returns "" otherwise),
+	//    notable bearers only, so it stays precise.
+	const pk = phoneticKey(q);
+	if (pk) {
+		const bearers = index.phonetic.get(pk);
+		if (bearers) return decide(index, topByWoman(bearers), DOMINANCE);
 	}
 
 	return { status: "none" };

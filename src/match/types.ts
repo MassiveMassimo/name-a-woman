@@ -16,4 +16,6 @@ export type IndexEntry = {
 export type MatchIndex = {
 	byId: Map<number, WomanRecord>;
 	buckets: Map<string, IndexEntry[]>;
+	// Phonetic-key → notable bearers, for the last-resort phonetic stage.
+	phonetic: Map<string, IndexEntry[]>;
 };

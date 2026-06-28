@@ -1,4 +1,5 @@
 import { normalize } from "./normalize";
+import { phoneticKey } from "./phonetic";
 import { surnameForms } from "./surname";
 import type { IndexEntry, MatchIndex, WomanRecord } from "./types";
 
@@ -13,9 +14,15 @@ export function bucketKey(form: string): string {
 // bearers is left to match()'s dominance/ambiguity logic.
 export const SURNAME_MIN_NOTABILITY = 10;
 
+// Phonetic keys are built only for clearly-famous women. The phonetic stage is
+// lower precision, so a higher floor keeps its class map small and its hits
+// confidently famous (Catherine/Katharine Hepburn, not an obscure namesake).
+export const PHONETIC_MIN_NOTABILITY = 30;
+
 export function buildIndex(records: WomanRecord[]): MatchIndex {
 	const byId = new Map<number, WomanRecord>();
 	const buckets = new Map<string, IndexEntry[]>();
+	const phonetic = new Map<string, IndexEntry[]>();
 
 	for (const r of records) {
 		byId.set(r.id, r);
@@ -49,10 +56,26 @@ export function buildIndex(records: WomanRecord[]): MatchIndex {
 			if (bucket) bucket.push(entry);
 			else buckets.set(key, [entry]);
 		}
+
+		if (r.notability >= PHONETIC_MIN_NOTABILITY) {
+			const pk = phoneticKey(r.name);
+			if (pk) {
+				const entry: IndexEntry = {
+					form: nameForm,
+					id: r.id,
+					notability: r.notability,
+					primary: false,
+					surname: false,
+				};
+				const bearers = phonetic.get(pk);
+				if (bearers) bearers.push(entry);
+				else phonetic.set(pk, [entry]);
+			}
+		}
 	}
 
 	for (const bucket of buckets.values()) {
 		bucket.sort((a, b) => b.notability - a.notability);
 	}
-	return { byId, buckets };
+	return { byId, buckets, phonetic };
 }
