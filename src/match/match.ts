@@ -84,27 +84,25 @@ export function match(input: string, index: MatchIndex): MatchResult {
 	const title = bucket.filter((e) => e.form === q && e.primary);
 	if (title.length > 0) return decide(index, topByWoman(title), K);
 
-	// 2. Otherwise judge the field the query exactly-aliases or prefixes. A true
-	//    mononym ("cher", "megawati") has one dominant bearer; a bare common
-	//    first name spreads across many comparably-notable women → too common.
-	const field = bucket.filter((e) => e.form.startsWith(q));
-	if (field.length > 0) {
-		// An exact form is a confident anchor (mononym/full name); a strict-prefix
-		// only counts above the smash floor (see MIN_INEXACT_LEN).
-		const hasExact = field.some((e) => e.form === q);
-		if (hasExact || q.length >= MIN_INEXACT_LEN) {
-			return decide(index, topByWoman(field), DOMINANCE);
-		}
+	// Below the inexact floor only an exact form is trustworthy: a short keyboard
+	// smash strict-prefixes — or sits one edit from — some obscure name and wins
+	// dominance over its neighbours (see MIN_INEXACT_LEN). Gating the strict-prefix
+	// scan on this also skips its allocation for the common short-keystroke case.
+	const inexactOk = q.length >= MIN_INEXACT_LEN;
+
+	// 2. Judge the field the query exactly-aliases or prefixes. A true mononym
+	//    ("cher", "megawati") has one dominant bearer; a bare common first name
+	//    spreads across many comparably-notable women → too common.
+	if (inexactOk || bucket.some((e) => e.form === q)) {
+		const field = bucket.filter((e) => e.form.startsWith(q));
+		if (field.length > 0) return decide(index, topByWoman(field), DOMINANCE);
 	}
 
-	// 3. No exact/prefix: a single-edit fuzzy pass for typos. Skipped below the
-	//    inexact-length floor — a one-edit match on a 2-3 char smash is noise.
-	if (q.length < MIN_INEXACT_LEN) return { status: "none" };
-
-	//    uFuzzy can match the query as a fragment buried inside a longer name
-	//    (e.g. "asdfg" inside "alexis penny casdagli"), so keep only whole-name
-	//    typos — length within the query's term count ("ada lovelce" → "ada
-	//    lovelace").
+	// 3. A single-edit fuzzy pass for typos — inexact, so floored. uFuzzy can
+	//    match the query as a fragment buried inside a longer name (e.g. "asdfg"
+	//    inside "alexis penny casdagli"), so keep only whole-name typos — length
+	//    within the query's term count ("ada lovelce" → "ada lovelace").
+	if (!inexactOk) return { status: "none" };
 	const forms = bucket.map((e) => e.form);
 	const idxs = uf.filter(forms, q);
 	if (idxs && idxs.length > 0) {
