@@ -6,6 +6,7 @@ import {
 	flyCardIn,
 	reflow,
 	rejectShake,
+	revealParticleField,
 	tickCounter,
 } from "./animations";
 import { isDevMode } from "./dev";
@@ -43,6 +44,7 @@ function init(game: HTMLElement): void {
 		"bg-field",
 	) as HTMLCanvasElement | null;
 	const field = bgCanvas ? createParticleField(bgCanvas) : null;
+	let fieldRevealed = false;
 
 	const dev = isDevMode(window.location.search);
 	let state: GameState = initialState();
@@ -169,7 +171,12 @@ function init(game: HTMLElement): void {
 			// Morph the particle field to the new woman's portrait; fail-open
 			summaryPromise
 				.then((s) => {
-					if (s.thumb) field?.morphTo(s.thumb);
+					if (!s.thumb) return;
+					field?.morphTo(s.thumb);
+					if (!fieldRevealed && bgCanvas) {
+						fieldRevealed = true;
+						revealParticleField(bgCanvas);
+					}
 				})
 				.catch(() => {});
 			// fire-and-forget global write; fail-open

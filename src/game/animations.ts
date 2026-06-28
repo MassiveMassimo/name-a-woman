@@ -89,6 +89,19 @@ export function clearReject(input: HTMLElement, wrap: HTMLElement): void {
 	input.classList.remove("is-error");
 }
 
+// Reveal the particle-field canvas with a blur-fade-in on first appearance.
+export function revealParticleField(canvas: HTMLCanvasElement): void {
+	if (prefersReduced()) {
+		gsap.set(canvas, { opacity: 1, filter: "blur(0px)" });
+		return;
+	}
+	gsap.fromTo(
+		canvas,
+		{ opacity: 0, filter: "blur(24px)" },
+		{ opacity: 1, filter: "blur(0px)", duration: 0.8, ease: "power2.out" },
+	);
+}
+
 // Animate the global counter readout from one value to the next.
 export function tickCounter(el: HTMLElement, from: number, to: number): void {
 	const obj = { v: from };
