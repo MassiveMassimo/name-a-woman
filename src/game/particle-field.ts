@@ -156,11 +156,13 @@ export function createParticleField(
 		let drawW = width;
 		let drawH = height;
 		if (srcRatio > dstRatio) {
-			drawH = height;
-			drawW = height * srcRatio;
-		} else {
+			// Image wider than container → fit to width (contain, no crop)
 			drawW = width;
 			drawH = width / srcRatio;
+		} else {
+			// Image taller than container → fit to height (contain, no crop)
+			drawH = height;
+			drawW = height * srcRatio;
 		}
 
 		drawW *= renderScale;
