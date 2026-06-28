@@ -118,8 +118,13 @@ export function Game() {
 	function playAgain() {
 		dispatch({ type: "RESET" });
 		setMessage("");
-		containerRef.current?.setAttribute("data-phase", "idle");
-		inputRef.current?.focus();
+		// mirror the idle→playing dock so the input glides back to center, not snaps
+		const el = inputRef.current;
+		const toIdle = () =>
+			containerRef.current?.setAttribute("data-phase", "idle");
+		if (el) dockInput(el, toIdle);
+		else toIdle();
+		el?.focus();
 	}
 
 	const mm = String(Math.floor(state.timeLeft / 60));
@@ -131,8 +136,10 @@ export function Game() {
 			data-phase="idle"
 			className="group relative flex min-h-svh flex-col bg-slate-50 px-5 data-[phase=idle]:items-center data-[phase=idle]:justify-center sm:px-10 lg:px-20 dark:bg-slate-900"
 		>
-			{/* corner readouts */}
-			<div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-5 text-slate-500 text-sm dark:text-slate-400">
+			{/* corner readouts; held hidden until the index loads to avoid a "0 of 0" flash */}
+			<div
+				className={`pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-5 text-slate-500 text-sm transition-opacity duration-300 dark:text-slate-400 ${ready ? "opacity-100" : "opacity-0"}`}
+			>
 				<span>
 					<span ref={counterRef}>0</span> of {total.toLocaleString()} named
 				</span>
