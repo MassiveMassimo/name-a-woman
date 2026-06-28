@@ -7,17 +7,40 @@ const prefersReduced = (): boolean =>
 	typeof window !== "undefined" &&
 	window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// New card enters from below: translate up + blur + fade in.
-export function transitionCardIn(card: HTMLElement): void {
+// Title flies from the input position to its card position (Flip-style).
+// Measures the input rect + computed font-size, then animates the title
+// from there with a scale + blur so the text appears to travel and settle.
+export function flyTitleFromInput(
+	titleEl: HTMLElement,
+	input: HTMLElement,
+): void {
 	if (prefersReduced()) {
-		gsap.set(card, { autoAlpha: 1, y: 0, filter: "blur(0px)" });
+		gsap.set(titleEl, {
+			autoAlpha: 1,
+			x: 0,
+			y: 0,
+			scale: 1,
+			filter: "blur(0px)",
+		});
 		return;
 	}
+	const inputRect = input.getBoundingClientRect();
+	const titleRect = titleEl.getBoundingClientRect();
+	const inputFs = parseFloat(getComputedStyle(input).fontSize);
+	const titleFs = parseFloat(getComputedStyle(titleEl).fontSize);
+	const dx = inputRect.left - titleRect.left;
+	const dy =
+		inputRect.top +
+		inputRect.height / 2 -
+		(titleRect.top + titleRect.height / 2);
+	const scale = inputFs / titleFs;
 	gsap.fromTo(
-		card,
-		{ y: 40, autoAlpha: 0, filter: "blur(12px)" },
+		titleEl,
+		{ x: dx, y: dy, scale, autoAlpha: 1, filter: "blur(8px)" },
 		{
+			x: 0,
 			y: 0,
+			scale: 1,
 			autoAlpha: 1,
 			filter: "blur(0px)",
 			duration: 0.6,

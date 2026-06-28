@@ -3,12 +3,12 @@ import {
 	clearReject,
 	clearWall,
 	dockInput,
+	flyTitleFromInput,
 	hideParticleField,
 	rejectShake,
 	revealExtract,
 	revealParticleField,
 	tickCounter,
-	transitionCardIn,
 	transitionCardOut,
 } from "./animations";
 import { isDevMode } from "./dev";
@@ -133,7 +133,6 @@ function init(game: HTMLElement): void {
 		if (!index || state.phase === "over") return;
 		const value = input.value.trim();
 		if (!value) return;
-		input.value = "";
 		messageEl.textContent = "";
 		clearReject(input, form); // drop any lingering reject before resolving
 
@@ -147,10 +146,12 @@ function init(game: HTMLElement): void {
 			// One summary fetch serves both the card content and the background field
 			const summaryPromise = fetchSummary(g.woman.name);
 			const card = buildCard(g.woman.name, summaryPromise);
-			// Crossfade: existing card(s) exit upward while new card enters from below
+			// Crossfade: existing card(s) exit upward while the title flies from input
 			const existing = [...wall.children] as HTMLElement[];
 			wall.appendChild(card);
-			transitionCardIn(card);
+			const titleEl = card.querySelector("[data-title]") as HTMLElement;
+			flyTitleFromInput(titleEl, input);
+			input.value = ""; // clear after animation starts so text "jumps" to card
 			for (const child of existing) {
 				transitionCardOut(child, () => child.remove());
 			}
@@ -170,9 +171,11 @@ function init(game: HTMLElement): void {
 				.then((r) => setCount(r.count))
 				.catch(() => {});
 		} else if (g.kind === "ambiguous") {
+			input.value = "";
 			messageEl.textContent = "too common";
 			rejectShake(input, form);
 		} else if (g.kind === "none") {
+			input.value = "";
 			messageEl.textContent = "not found";
 			rejectShake(input, form);
 		}
