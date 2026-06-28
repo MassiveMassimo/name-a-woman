@@ -17,8 +17,8 @@ export function Card({ title }: { title: string }) {
 	const thumb = summary?.thumb ?? null;
 
 	return (
-		<div className="card w-36 shrink-0 overflow-hidden rounded-2xl border border-slate-700 bg-slate-800">
-			<div className="relative h-24 bg-gradient-to-br from-slate-600 to-slate-700">
+		<div className="card w-36 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
+			<div className="relative h-24 bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-600 dark:to-slate-700">
 				{thumb && (
 					<img
 						src={thumb}
@@ -32,10 +32,10 @@ export function Card({ title }: { title: string }) {
 				)}
 			</div>
 			<div className="p-2.5">
-				<div className="font-medium text-slate-100 text-sm leading-tight">
+				<div className="font-medium text-slate-900 text-sm leading-tight dark:text-slate-100">
 					{title}
 				</div>
-				<div className="mt-1 line-clamp-3 text-[11px] text-slate-400 leading-snug">
+				<div className="mt-1 line-clamp-3 text-[11px] text-slate-500 leading-snug dark:text-slate-400">
 					{summary?.extract ?? ""}
 				</div>
 			</div>

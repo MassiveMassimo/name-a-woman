@@ -22,7 +22,7 @@ import { initialState, reduce } from "./state";
 import { useMatchIndex } from "./useMatchIndex";
 
 const inputClass =
-	"input h-auto w-full rounded-none border-x-0 border-t-0 border-b-4 border-slate-700 bg-transparent text-4xl capitalize text-slate-100 outline-none transition-colors duration-300 placeholder:normal-case placeholder:text-slate-600 focus:border-slate-300 focus:placeholder:text-slate-500 sm:text-7xl lg:text-9xl";
+	"input h-auto w-full rounded-none border-x-0 border-t-0 border-b-4 border-slate-300 bg-transparent text-4xl capitalize text-slate-900 outline-none transition-colors duration-300 placeholder:normal-case placeholder:text-slate-400 focus:border-slate-900 focus:placeholder:text-slate-500 sm:text-7xl lg:text-9xl dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-600 dark:focus:border-slate-300";
 
 export function Game() {
 	const { index, total, ready } = useMatchIndex();
@@ -129,10 +129,10 @@ export function Game() {
 		<main
 			ref={containerRef}
 			data-phase="idle"
-			className="group relative flex min-h-svh flex-col bg-slate-900 px-5 data-[phase=idle]:items-center data-[phase=idle]:justify-center sm:px-10 lg:px-20"
+			className="group relative flex min-h-svh flex-col bg-slate-50 px-5 data-[phase=idle]:items-center data-[phase=idle]:justify-center sm:px-10 lg:px-20 dark:bg-slate-900"
 		>
 			{/* corner readouts */}
-			<div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-5 text-slate-400 text-sm">
+			<div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-5 text-slate-500 text-sm dark:text-slate-400">
 				<span>
 					<span ref={counterRef}>0</span> of {total.toLocaleString()} named
 				</span>
@@ -176,13 +176,17 @@ export function Game() {
 
 			{/* game over overlay */}
 			{state.phase === "over" && (
-				<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-slate-900/90">
-					<p className="text-2xl text-slate-300">Time! You named</p>
-					<p className="text-8xl text-slate-100">{state.named.length}</p>
+				<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-slate-50/90 dark:bg-slate-900/90">
+					<p className="text-2xl text-slate-600 dark:text-slate-300">
+						Time! You named
+					</p>
+					<p className="text-8xl text-slate-900 dark:text-slate-100">
+						{state.named.length}
+					</p>
 					<button
 						type="button"
 						onClick={playAgain}
-						className="rounded-full bg-slate-100 px-6 py-2 text-slate-900 transition-transform active:scale-95"
+						className="rounded-full bg-slate-900 px-6 py-2 text-slate-50 transition-transform active:scale-95 dark:bg-slate-100 dark:text-slate-900"
 					>
 						Play Again
 					</button>

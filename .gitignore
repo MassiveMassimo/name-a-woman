@@ -23,3 +23,10 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# superpowers scratch (brainstorm mockups, SDD ledger)
+.superpowers/
+
+# maestri / skill tooling
+.agents/
+skills-lock.json
