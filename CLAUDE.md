@@ -62,6 +62,13 @@ These are decided in the architecture spec; document the *why* here so they surv
 
 ## Stack
 
-Astro 7 (static, CDN) + React 19 islands + Tailwind v4 + Biome + Bun. Animations: CSS
-`@starting-style`/transforms + WAAPI on the hot path, Motion `useSpring` only for the counter.
-**Do not add astroanimate** (unmaintained, Astro 4/5 only, wrong paradigm — see spec §8).
+Astro 7 (static, CDN) + Tailwind v4 + Biome + Bun. **No framework runtime** — the game is
+plain HTML in `Game.astro` driven by a bundled client TS module (`src/game/game.client.ts`),
+not React islands. The interactive surface (one input, flying cards, a counter) is
+animation-heavy and imperative, so vanilla DOM + GSAP beats fighting a render cycle, and the
+page ships zero framework JS. The pure logic (`match/`, `state`, `resolve`, `summary`, `global`,
+`dev`) stays framework-agnostic and is imported by the script.
+
+Animations: GSAP + Flip on the hot path (card fly-in, wall reflow, input dock) and the counter
+tween; transitions.dev CSS for the card skeleton-reveal and the reject shake. **Do not add
+astroanimate** (unmaintained, Astro 4/5 only, wrong paradigm — see spec §8).
