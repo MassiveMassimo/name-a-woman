@@ -8,6 +8,7 @@ import {
 } from "react";
 import {
 	captureCards,
+	clearReject,
 	dockInput,
 	flyCardIn,
 	reflow,
@@ -31,6 +32,7 @@ export function Game() {
 	const [count, setCount] = useState(0);
 
 	const inputRef = useRef<HTMLInputElement>(null);
+	const formRef = useRef<HTMLFormElement>(null);
 	const wallRef = useRef<HTMLDivElement>(null);
 	const counterRef = useRef<HTMLSpanElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -85,11 +87,13 @@ export function Game() {
 	function onSubmit(e: FormEvent<HTMLFormElement>) {
 		e.preventDefault();
 		const el = inputRef.current;
-		if (!el || !index || state.phase === "over") return;
+		const wrap = formRef.current;
+		if (!el || !wrap || !index || state.phase === "over") return;
 		const value = el.value.trim();
 		if (!value) return;
 		el.value = "";
 		setMessage("");
+		clearReject(el, wrap); // drop any lingering reject before resolving
 
 		const namedIds = new Set(state.named.map((n) => n.id));
 		const g = resolveGuess(value, index, namedIds);
@@ -107,10 +111,10 @@ export function Game() {
 				.catch(() => {});
 		} else if (g.kind === "ambiguous") {
 			setMessage("too common");
-			rejectShake(el);
+			rejectShake(el, wrap);
 		} else if (g.kind === "none") {
 			setMessage("not found");
-			rejectShake(el);
+			rejectShake(el, wrap);
 		}
 		// duplicate: soft no-op
 	}
@@ -120,6 +124,7 @@ export function Game() {
 		setMessage("");
 		// mirror the idle→playing dock so the input glides back to center, not snaps
 		const el = inputRef.current;
+		if (el && formRef.current) clearReject(el, formRef.current);
 		const toIdle = () =>
 			containerRef.current?.setAttribute("data-phase", "idle");
 		if (el) dockInput(el, toIdle);
@@ -165,12 +170,13 @@ export function Game() {
 
 			{/* input */}
 			<form
+				ref={formRef}
 				onSubmit={onSubmit}
-				className="w-full group-data-[phase=playing]:pb-10"
+				className="t-input-wrap w-full group-data-[phase=playing]:pb-10"
 			>
 				<input
 					ref={inputRef}
-					className={inputClass}
+					className={`t-input ${inputClass}`}
 					type="text"
 					name="name"
 					placeholder="Name a woman"
@@ -178,7 +184,7 @@ export function Game() {
 					disabled={!ready || state.phase === "over"}
 					onChange={onChange}
 				/>
-				{message && <p className="mt-2 text-slate-500 text-sm">{message}</p>}
+				<p className="t-error-msg mt-2 text-sm">{message}</p>
 			</form>
 
 			{/* game over overlay */}
