@@ -90,7 +90,7 @@ export function match(input: string, index: MatchIndex): MatchResult {
 	const field = bucket.filter((e) => e.form.startsWith(q));
 	if (field.length > 0) {
 		// An exact form is a confident anchor (mononym/full name); a strict-prefix
-		// only counts above the smash floor (see PREFIX_MIN_LEN).
+		// only counts above the smash floor (see MIN_INEXACT_LEN).
 		const hasExact = field.some((e) => e.form === q);
 		if (hasExact || q.length >= MIN_INEXACT_LEN) {
 			return decide(index, topByWoman(field), DOMINANCE);
