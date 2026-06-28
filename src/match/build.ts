@@ -11,14 +11,24 @@ export function buildIndex(records: WomanRecord[]): MatchIndex {
 
 	for (const r of records) {
 		byId.set(r.id, r);
+		// The article title (r.name) is the primary form; aliases are secondary.
+		// A form that equals the normalized title is marked primary even when it
+		// also appears among the aliases.
+		const nameForm = normalize(r.name);
 		const forms = new Set<string>();
-		for (const raw of [r.name, ...r.aliases]) {
-			const form = normalize(raw);
+		if (nameForm) forms.add(nameForm);
+		for (const a of r.aliases) {
+			const form = normalize(a);
 			if (form) forms.add(form);
 		}
 		for (const form of forms) {
 			const key = bucketKey(form);
-			const entry: IndexEntry = { form, id: r.id, notability: r.notability };
+			const entry: IndexEntry = {
+				form,
+				id: r.id,
+				notability: r.notability,
+				primary: form === nameForm,
+			};
 			const bucket = buckets.get(key);
 			if (bucket) bucket.push(entry);
 			else buckets.set(key, [entry]);

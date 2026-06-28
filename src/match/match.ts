@@ -4,10 +4,17 @@ import { bucketKey } from "./build";
 import { normalize } from "./normalize";
 import type { IndexEntry, MatchIndex, WomanRecord } from "./types";
 
-// Notability margin: on an exact-name collision the top woman must beat the
-// second by this factor to win outright; otherwise the query is ambiguous.
-// Tunable — calibrate against a real eval set (spec §2, §10).
+// Notability margin for an exact article-title collision (two distinct women
+// share the same title, e.g. two "Jennifer Jones"): the top must beat the
+// second by this factor to win outright, else ambiguous. Calibrated on a real
+// eval set (spec §2, §10).
 export const K = 5;
+
+// Dominance margin for the prefix field (a bare name like "cher" that prefixes
+// many different women): the top bearer must beat the next by this factor to be
+// the primary topic, else the name is too common. Looser than K because the
+// field bearers have different names, not an identical one.
+export const DOMINANCE = 2;
 
 // Single-edit fuzzy matcher: tolerate one insert, substitute, transpose, or
 // delete per term. Constructed once at module load (zero-overhead haystack).
@@ -35,17 +42,21 @@ function topByWoman(entries: IndexEntry[]): IndexEntry[] {
 	return [...best.values()].sort((a, b) => b.notability - a.notability);
 }
 
-// Apply the notability-margin judge to a set of distinct-woman candidates that
-// all matched the query exactly (or fuzzily). One → accept; many → accept the
-// dominant one only if it clears margin K; otherwise ambiguous.
-function judge(index: MatchIndex, ranked: IndexEntry[]): MatchResult {
+// Decide a winner among distinct-woman candidates ranked by notability. One →
+// accept; many → accept the top only if it clears the given margin over the
+// second; otherwise ambiguous.
+function decide(
+	index: MatchIndex,
+	ranked: IndexEntry[],
+	margin: number,
+): MatchResult {
 	if (ranked.length === 0) return { status: "none" };
 	if (ranked.length === 1) {
 		const woman = index.byId.get(ranked[0].id);
 		return woman ? { status: "matched", woman } : { status: "none" };
 	}
 	const [first, second] = ranked;
-	if (first.notability >= K * Math.max(second.notability, 1)) {
+	if (first.notability >= margin * Math.max(second.notability, 1)) {
 		const woman = index.byId.get(first.id);
 		return woman ? { status: "matched", woman } : { status: "none" };
 	}
@@ -58,20 +69,32 @@ export function match(input: string, index: MatchIndex): MatchResult {
 
 	const bucket = index.buckets.get(bucketKey(q)) ?? [];
 
-	const exact = bucket.filter((e) => e.form === q);
-	if (exact.length > 0) return judge(index, topByWoman(exact));
+	// 1. The query is exactly a woman's article title → Wikipedia's primary
+	//    topic. Titles are effectively unique, so common first names are
+	//    disambiguation pages (no woman is titled exactly "Michelle"); they only
+	//    appear here as aliases, which are handled by the field judge below.
+	const title = bucket.filter((e) => e.form === q && e.primary);
+	if (title.length > 0) return decide(index, topByWoman(title), K);
 
-	// No exact match: try a single-edit fuzzy pass over this bucket's forms.
+	// 2. Otherwise judge the field the query exactly-aliases or prefixes. A true
+	//    mononym ("cher", "megawati") has one dominant bearer; a bare common
+	//    first name spreads across many comparably-notable women → too common.
+	const field = bucket.filter((e) => e.form.startsWith(q));
+	if (field.length > 0) return decide(index, topByWoman(field), DOMINANCE);
+
+	// 3. No exact/prefix: a single-edit fuzzy pass for typos. uFuzzy can match
+	//    the query as a fragment buried inside a longer name (e.g. "asdfg" inside
+	//    "alexis penny casdagli"), so keep only whole-name typos — length within
+	//    the query's term count ("ada lovelce" → "ada lovelace").
 	const forms = bucket.map((e) => e.form);
 	const idxs = uf.filter(forms, q);
 	if (idxs && idxs.length > 0) {
-		const fuzzy = idxs.map((i) => bucket[i]);
-		return judge(index, topByWoman(fuzzy));
+		const maxLenDiff = q.split(" ").length;
+		const fuzzy = idxs
+			.map((i) => bucket[i])
+			.filter((e) => Math.abs(e.form.length - q.length) <= maxLenDiff);
+		if (fuzzy.length > 0) return decide(index, topByWoman(fuzzy), DOMINANCE);
 	}
-
-	// No exact, no fuzzy. A pure prefix of many forms = incomplete/too-common.
-	const prefix = bucket.filter((e) => e.form.startsWith(q));
-	if (prefix.length > 0) return { status: "ambiguous" };
 
 	return { status: "none" };
 }

@@ -34,3 +34,10 @@ test("byId resolves full records", () => {
 	const idx = buildIndex(records);
 	expect(idx.byId.get(1)?.name).toBe("Megawati Sukarnoputri");
 });
+
+test("marks the article-title form primary and aliases non-primary", () => {
+	const idx = buildIndex(records);
+	const m = idx.buckets.get("m") ?? [];
+	expect(m.find((e) => e.form === "megawati sukarnoputri")?.primary).toBe(true);
+	expect(m.find((e) => e.form === "megawati")?.primary).toBe(false);
+});

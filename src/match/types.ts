@@ -9,6 +9,7 @@ export type IndexEntry = {
 	form: string; // normalized name or alias
 	id: number;
 	notability: number;
+	primary: boolean; // form derives from the article title (vs an alias)
 };
 
 export type MatchIndex = {
