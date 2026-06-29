@@ -1,12 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import { fetchSummary } from "./summary";
 
-// Route by endpoint: Wikidata (P18 portrait) vs Wikipedia REST summary.
+// Route by endpoint: Wikidata (P18 portrait), Commons (filename -> direct URL),
+// and Wikipedia REST summary.
 function router(opts: {
 	summaryStatus?: number;
 	summaryBody?: unknown;
 	wikidataStatus?: number;
 	wikidataBody?: unknown;
+	commonsStatus?: number;
+	commonsBody?: unknown;
 	onUrl?: (u: string) => void;
 }): typeof fetch {
 	const {
@@ -14,22 +17,34 @@ function router(opts: {
 		summaryBody = {},
 		wikidataStatus = 200,
 		wikidataBody = {},
+		commonsStatus = 200,
+		commonsBody = {},
 		onUrl,
 	} = opts;
 	return (async (url: string) => {
 		onUrl?.(url);
 		const isWd = url.includes("wikidata.org");
-		const status = isWd ? wikidataStatus : summaryStatus;
+		const isCommons = url.includes("commons.wikimedia.org");
+		const status = isWd
+			? wikidataStatus
+			: isCommons
+				? commonsStatus
+				: summaryStatus;
+		const body = isWd ? wikidataBody : isCommons ? commonsBody : summaryBody;
 		return {
 			ok: status >= 200 && status < 300,
 			status,
-			json: async () => (isWd ? wikidataBody : summaryBody),
+			json: async () => body,
 		} as Response;
 	}) as unknown as typeof fetch;
 }
 
 const p18 = (file: string) => ({
 	claims: { P18: [{ mainsnak: { datavalue: { value: file } } }] },
+});
+
+const commons = (thumburl: string) => ({
+	query: { pages: { "1": { title: "File:x", imageinfo: [{ thumburl }] } } },
 });
 
 describe("fetchSummary", () => {
@@ -40,9 +55,10 @@ describe("fetchSummary", () => {
 				thumbnail: { source: "https://example.org/sig.svg.png" },
 			},
 			wikidataBody: p18("Marie Curie portrait.jpg"),
+			commonsBody: commons("https://upload.wikimedia.org/curie.jpg"),
 		});
 		const s = await fetchSummary("Marie Curie", 7186, f);
-		expect(s.thumb).toContain("Special:FilePath/Marie%20Curie%20portrait.jpg");
+		expect(s.thumb).toBe("https://upload.wikimedia.org/curie.jpg");
 		expect(s.extract).toBe("A physicist.");
 	});
 
@@ -69,10 +85,40 @@ describe("fetchSummary", () => {
 	});
 
 	it("P18 is independent of a failed summary fetch", async () => {
-		const f = router({ summaryStatus: 404, wikidataBody: p18("Photo.jpg") });
+		const f = router({
+			summaryStatus: 404,
+			wikidataBody: p18("Photo.jpg"),
+			commonsBody: commons("https://upload.wikimedia.org/photo.jpg"),
+		});
 		const s = await fetchSummary("Missing", 1, f);
 		expect(s.extract).toBeNull();
-		expect(s.thumb).toContain("Photo.jpg");
+		expect(s.thumb).toBe("https://upload.wikimedia.org/photo.jpg");
+	});
+
+	it("falls back to the summary thumb when Commons lookup fails", async () => {
+		const f = router({
+			summaryBody: {
+				extract: "x",
+				thumbnail: { source: "https://example.org/curie.jpg" },
+			},
+			wikidataBody: p18("Marie Curie portrait.jpg"),
+			commonsStatus: 500,
+		});
+		const s = await fetchSummary("Marie Curie", 7186, f);
+		expect(s.thumb).toBe("https://example.org/curie.jpg");
+	});
+
+	it("falls back to the summary thumb when Commons has no imageinfo", async () => {
+		const f = router({
+			summaryBody: {
+				extract: "x",
+				thumbnail: { source: "https://example.org/curie.jpg" },
+			},
+			wikidataBody: p18("Missing.jpg"),
+			commonsBody: { query: { pages: { "-1": {} } } },
+		});
+		const s = await fetchSummary("Marie Curie", 7186, f);
+		expect(s.thumb).toBe("https://example.org/curie.jpg");
 	});
 
 	it("fails open to nulls when fetch throws", async () => {
@@ -89,5 +135,22 @@ describe("fetchSummary", () => {
 		await fetchSummary("Frida Kahlo", 5588, f);
 		expect(urls.some((u) => u.includes("Frida%20Kahlo"))).toBe(true);
 		expect(urls.some((u) => u.includes("Q5588"))).toBe(true);
+	});
+
+	it("queries the Commons API with the P18 filename", async () => {
+		const urls: string[] = [];
+		const f = router({
+			wikidataBody: p18("Marie Curie (1900) (cropped).jpg"),
+			commonsBody: commons("https://upload.wikimedia.org/curie.jpg"),
+			onUrl: (u) => urls.push(u),
+		});
+		await fetchSummary("Marie Curie", 7186, f);
+		const commonsUrl = urls.find((u) => u.includes("commons.wikimedia.org"));
+		expect(commonsUrl).toBeDefined();
+		expect(commonsUrl).toContain(
+			"File%3AMarie+Curie+%281900%29+%28cropped%29.jpg",
+		);
+		expect(commonsUrl).toContain("iiurlwidth=640");
+		expect(commonsUrl).toContain("origin=*");
 	});
 });
