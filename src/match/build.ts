@@ -1,10 +1,28 @@
 import { normalize } from "./normalize";
 import { phoneticKey } from "./phonetic";
 import { surnameForms } from "./surname";
-import type { IndexEntry, MatchIndex, WomanRecord } from "./types";
+import type {
+	ExcludedRecord,
+	IndexEntry,
+	MatchIndex,
+	WomanRecord,
+} from "./types";
 
 export function bucketKey(form: string): string {
 	return form.length === 0 ? "" : form[0];
+}
+
+// Wikidata carries descriptive "aliases" that are relationships or events, not
+// names anyone would type to recall the woman herself: "Miley Cyrus's mom"
+// (Tish Cyrus), "wife of Sir Michael Wood", "Sarina Esmailzadeh's death". Left
+// in, they hijack a query for the famous relative (typing "miley cyrus" lands on
+// her mother). Dropped from the matchable forms; the article title is untouched.
+const POSSESSIVE_ALIAS = /['’]s\s+\S+/;
+const RELATIONAL_ALIAS =
+	/\b(wife|widow|husband|mother|mom|father|dad|daughter|son|sister|brother|sibling|partner|girlfriend|boyfriend|spouse|consort|mistress|grandmother|grandfather|aunt|uncle|niece|nephew|cousin) of\b/i;
+
+export function isRelationalAlias(alias: string): boolean {
+	return POSSESSIVE_ALIAS.test(alias) || RELATIONAL_ALIAS.test(alias);
 }
 
 // Surname-only forms ("rowling", "curie") are generated only for women notable
@@ -19,7 +37,10 @@ export const SURNAME_MIN_NOTABILITY = 10;
 // confidently famous (Catherine/Katharine Hepburn, not an obscure namesake).
 export const PHONETIC_MIN_NOTABILITY = 30;
 
-export function buildIndex(records: WomanRecord[]): MatchIndex {
+export function buildIndex(
+	records: WomanRecord[],
+	excludedRecords: ExcludedRecord[] = [],
+): MatchIndex {
 	const byId = new Map<number, WomanRecord>();
 	const buckets = new Map<string, IndexEntry[]>();
 	const phonetic = new Map<string, IndexEntry[]>();
@@ -39,7 +60,10 @@ export function buildIndex(records: WomanRecord[]): MatchIndex {
 			else if (!surname) forms.set(f, false);
 		};
 		addForm(nameForm, false);
-		for (const a of r.aliases) addForm(normalize(a), false);
+		for (const a of r.aliases) {
+			if (isRelationalAlias(a)) continue;
+			addForm(normalize(a), false);
+		}
 		if (r.notability >= SURNAME_MIN_NOTABILITY) {
 			for (const s of surnameForms(r.name)) addForm(s, true);
 		}
@@ -77,5 +101,20 @@ export function buildIndex(records: WomanRecord[]): MatchIndex {
 	for (const bucket of buckets.values()) {
 		bucket.sort((a, b) => b.notability - a.notability);
 	}
-	return { byId, buckets, phonetic };
+
+	// Excluded people are matched exactly on name + aliases (no prefix/fuzzy): a
+	// player either names the person or they don't. First writer wins a shared
+	// form; relational aliases are filtered here too.
+	const excluded = new Map<string, { name: string; gender: string }>();
+	for (const e of excludedRecords) {
+		for (const form of [e.name, ...e.aliases]) {
+			if (isRelationalAlias(form)) continue;
+			const key = normalize(form);
+			if (key && !excluded.has(key)) {
+				excluded.set(key, { name: e.name, gender: e.gender });
+			}
+		}
+	}
+
+	return { byId, buckets, phonetic, excluded };
 }

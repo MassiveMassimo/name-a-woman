@@ -38,10 +38,19 @@ export function rejectShake(input: HTMLElement, wrap: HTMLElement): void {
 	rejectTimer = setTimeout(() => clearReject(input, wrap), 3000); // --revert-hold
 }
 
+// Recognized but doesn't count (excluded by gender identity): reveal the message
+// in purple, no shake — it is information, not an error. Same auto-revert hold.
+export function showExcluded(input: HTMLElement, wrap: HTMLElement): void {
+	wrap.classList.add("is-excluded");
+	input.classList.add("is-excluded");
+	clearTimeout(rejectTimer);
+	rejectTimer = setTimeout(() => clearReject(input, wrap), 3000); // --revert-hold
+}
+
 export function clearReject(input: HTMLElement, wrap: HTMLElement): void {
 	clearTimeout(rejectTimer);
-	wrap.classList.remove("is-error");
-	input.classList.remove("is-error");
+	wrap.classList.remove("is-error", "is-excluded");
+	input.classList.remove("is-error", "is-shaking", "is-excluded");
 }
 
 // Reveal the particle-field canvas with a blur-fade-in on first appearance.

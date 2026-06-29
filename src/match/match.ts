@@ -38,7 +38,17 @@ const uf = new uFuzzy({
 export type MatchResult =
 	| { status: "matched"; woman: WomanRecord }
 	| { status: "ambiguous" }
+	| { status: "excluded"; name: string; gender: string }
 	| { status: "none" };
+
+// Final fallback when no woman matched: acknowledge a recognized person who is
+// excluded from the index by gender identity, else a plain miss.
+function notFound(index: MatchIndex, q: string): MatchResult {
+	const ex = index.excluded.get(q);
+	return ex
+		? { status: "excluded", name: ex.name, gender: ex.gender }
+		: { status: "none" };
+}
 
 // Reduce candidate entries to the best entry per distinct woman, ranked by
 // notability descending. Returns at most one entry per woman id.
@@ -110,7 +120,7 @@ export function match(input: string, index: MatchIndex): MatchResult {
 	//    longer name (e.g. "asdfg" inside "alexis penny casdagli"), so keep only
 	//    whole-name typos — length within the query's term count ("ada lovelce" →
 	//    "ada lovelace").
-	if (!inexactOk) return { status: "none" };
+	if (!inexactOk) return notFound(index, q);
 	const fuzzable = bucket.filter((e) => !e.surname);
 	const forms = fuzzable.map((e) => e.form);
 	const idxs = uf.filter(forms, q);
@@ -132,5 +142,6 @@ export function match(input: string, index: MatchIndex): MatchResult {
 		if (bearers) return decide(index, topByWoman(bearers), DOMINANCE);
 	}
 
-	return { status: "none" };
+	// 5. No woman matched — acknowledge an excluded person, else a plain miss.
+	return notFound(index, q);
 }
