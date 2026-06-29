@@ -5,15 +5,53 @@ export interface Summary {
 
 const SUMMARY_ENDPOINT = "https://en.wikipedia.org/api/rest_v1/page/summary/";
 const WIKIDATA_ENDPOINT = "https://www.wikidata.org/w/api.php";
-const COMMONS_FILEPATH = "https://commons.wikimedia.org/wiki/Special:FilePath/";
+const COMMONS_API = "https://commons.wikimedia.org/w/api.php";
 const THUMB_WIDTH = 640;
+
+// Resolve a Commons filename to a direct upload.wikimedia.org URL. The
+// Special:FilePath convenience link 302-redirects cross-host without CORS
+// headers, so an Image loaded with crossOrigin="anonymous" fails the CORS check
+// on the redirect and never fires onload — the particle field morph, which
+// reads pixels via getImageData, would silently break. The Commons API
+// (origin=*) returns the final thumburl, which upload.wikimedia.org serves with
+// Access-Control-Allow-Origin: *. Fail-open: any error yields null.
+async function resolveCommonsUrl(
+	file: string,
+	fetchImpl: typeof fetch,
+): Promise<string | null> {
+	try {
+		const params = new URLSearchParams({
+			action: "query",
+			titles: `File:${file}`,
+			prop: "imageinfo",
+			iiprop: "url",
+			iiurlwidth: String(THUMB_WIDTH),
+			format: "json",
+			origin: "*",
+		});
+		const res = await fetchImpl(`${COMMONS_API}?${params}`);
+		if (!res.ok) return null;
+		const data = (await res.json()) as {
+			query?: {
+				pages?: Record<
+					string,
+					{ imageinfo?: { thumburl?: string; url?: string }[] }
+				>;
+			};
+		};
+		const info = Object.values(data.query?.pages ?? {})[0]?.imageinfo?.[0];
+		return info?.thumburl ?? info?.url ?? null;
+	} catch {
+		return null;
+	}
+}
 
 // Wikidata's "image" (P18) is hand-curated, so it is a real portrait. The REST
 // summary thumbnail is driven by Wikipedia's PageImages heuristic, which often
 // mis-picks a non-portrait lead file (a signature, logo, flag, or coat of arms —
 // e.g. Pokimane's signature SVG). Prefer P18, keyed by the woman's Wikidata QID
-// (the index `id`); fall back to the summary thumbnail. Returns a Commons thumb
-// URL or null. Fail-open.
+// (the index `id`); resolve the filename to a CORS-safe direct URL, and fall
+// back to the summary thumbnail. Fail-open.
 async function fetchPortrait(
 	id: number,
 	fetchImpl: typeof fetch,
@@ -27,7 +65,7 @@ async function fetchPortrait(
 		};
 		const file = data.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
 		if (!file) return null;
-		return `${COMMONS_FILEPATH}${encodeURIComponent(file)}?width=${THUMB_WIDTH}`;
+		return await resolveCommonsUrl(file, fetchImpl);
 	} catch {
 		return null;
 	}
