@@ -53,6 +53,19 @@ function init(game: HTMLElement): void {
 	let prevCount = 0;
 	let timerId: ReturnType<typeof setInterval> | undefined;
 
+	const summaryCache = new Map<string, Promise<Summary>>();
+
+	// Fire fetchSummary if we haven't already; cached so repeated keystrokes
+	// for the same woman don't duplicate the request.
+	function prefetchSummary(name: string): Promise<Summary> {
+		let p = summaryCache.get(name);
+		if (!p) {
+			p = fetchSummary(name);
+			summaryCache.set(name, p);
+		}
+		return p;
+	}
+
 	function render(): void {
 		const m = Math.floor(state.timeLeft / 60);
 		const s = String(state.timeLeft % 60).padStart(2, "0");
@@ -96,48 +109,99 @@ function init(game: HTMLElement): void {
 	}
 
 	// Build a single full-bleed card: large name (left-aligned) + first Wikipedia
-	// sentence. The name staggers in via t-stagger; the extract uses t-text-swap
-	// to crossfade from empty to the resolved Wikipedia text.
-	function buildCard(
-		title: string,
-		summaryPromise: Promise<Summary>,
-	): HTMLElement {
+	// sentence. Both lines stagger in together — the summary is already resolved
+	// before the card is built so the caption has real content at entrance.
+	function buildCard(title: string, summary: Summary): HTMLElement {
 		const card = document.createElement("div");
 		card.className =
 			"card t-stagger absolute inset-0 flex items-center px-5 sm:px-10 lg:px-20";
 		card.innerHTML = `
 			<div class="max-w-xl">
 				<strong class="t-stagger-line t-stagger-line--1 font-fraunces font-medium text-5xl leading-tight text-gray-900 sm:text-6xl dark:text-gray-100" data-title></strong>
-				<span class="t-stagger-line t-stagger-line--2 mt-4 block min-h-24 text-xl text-gray-600 sm:text-2xl dark:text-gray-400">
-					<span class="t-text-swap" data-extract></span>
-				</span>
+				<span class="t-stagger-line t-stagger-line--2 mt-4 block min-h-24 text-xl text-gray-600 sm:text-2xl dark:text-gray-400" data-extract></span>
 			</div>`;
 		(card.querySelector("[data-title]") as HTMLElement).textContent = title;
-		const extractEl = card.querySelector("[data-extract]") as HTMLElement;
-		summaryPromise.then((s) => {
-			if (!card.isConnected) return;
-			const text = s.extract ? firstSentence(s.extract) : "";
-			if (!text) return;
-			// t-text-swap three-phase: exit empty, swap text, enter new
-			extractEl.classList.add("is-exit");
-			setTimeout(() => {
-				if (!card.isConnected) return;
-				extractEl.textContent = text;
-				extractEl.classList.remove("is-exit");
-				extractEl.classList.add("is-enter-start");
-				void extractEl.offsetWidth; // force reflow
-				extractEl.classList.remove("is-enter-start");
-			}, 150); // --text-swap-dur
-		});
+		(card.querySelector("[data-extract]") as HTMLElement).textContent =
+			summary.extract ? firstSentence(summary.extract) : "";
 		return card;
 	}
 
-	// first keystroke starts the round and docks the input to the bottom
+	// Shimmer overlay — masks the input text after submit while the
+	// Wikipedia summary fetches. <input> can't host ::before, so we
+	// overlay a span with t-shimmer. Mirrors the input's border-b-4 and
+	// flex-centers the text so it sits where the input's text sits.
+	// overflow:hidden + scroll matching keeps long names aligned with
+	// the input's tail-scroll position.
+	const shimmerOverlay = document.createElement("div");
+	shimmerOverlay.className =
+		"pointer-events-none absolute inset-0 hidden overflow-hidden flex items-center border-b-4 border-transparent text-4xl capitalize sm:text-7xl lg:text-9xl";
+	shimmerOverlay.innerHTML = '<span class="t-shimmer"></span>';
+	inputSlot.appendChild(shimmerOverlay);
+
+	function showShimmer(name: string): void {
+		const span = shimmerOverlay.querySelector(".t-shimmer") as HTMLElement;
+		span.textContent = name;
+		span.setAttribute("data-text", name);
+		// Match the input's horizontal scroll so the shimmer shows the
+		// same visible portion (tail) as the input does for long names.
+		span.style.transform = `translateX(${-input.scrollLeft}px)`;
+		shimmerOverlay.classList.remove("hidden");
+		input.style.color = "transparent";
+	}
+
+	function hideShimmer(): void {
+		shimmerOverlay.classList.add("hidden");
+		input.style.color = "";
+	}
+
+	// Crossfade: append the new card, stagger/fade out any existing cards on
+	// top, remove them after the exit transition.
+	function swapCards(newCard: HTMLElement): void {
+		const existing = [...wall.children] as HTMLElement[];
+		wall.appendChild(newCard);
+		requestAnimationFrame(() => newCard.classList.add("is-shown"));
+		for (const child of existing) {
+			child.style.zIndex = "1";
+			child.classList.add("is-hiding");
+			child.classList.remove("is-shown");
+			setTimeout(() => child.remove(), 450);
+		}
+	}
+
+	// Await the summary, then clear the shimmer mask and crossfade the
+	// real card in. On a prefetch cache hit the await resolves in a
+	// microtask — the shimmer flashes for one frame, then the card
+	// staggers in.
+	async function animateCard(
+		name: string,
+		summaryPromise: Promise<Summary>,
+	): Promise<void> {
+		const summary = await summaryPromise;
+		hideShimmer();
+		input.value = "";
+		if (state.phase !== "playing") return;
+		swapCards(buildCard(name, summary));
+	}
+
+	// first keystroke starts the round and docks the input to the bottom.
+	// Also clears any lingering shimmer from a pending submit.
 	input.addEventListener("input", () => {
 		if (state.phase === "idle" && input.value.length > 0) {
 			dockInput(inputSlot, () => game.setAttribute("data-phase", "playing"));
 			dispatch({ type: "START" });
 			startTimer();
+		}
+		hideShimmer();
+		// Invisible prefetch — fire the Wikipedia summary fetch when the
+		// input unambiguously resolves to a not-yet-named woman, so the
+		// card can animate in without waiting on submit.
+		if (index && state.phase === "playing") {
+			const value = input.value.trim();
+			if (value) {
+				const namedIds = new Set(state.named.map((n) => n.id));
+				const g = resolveGuess(value, index, namedIds);
+				if (g.kind === "accept") prefetchSummary(g.woman.name);
+			}
 		}
 	});
 
@@ -146,7 +210,6 @@ function init(game: HTMLElement): void {
 		if (!index || state.phase === "over") return;
 		const value = input.value.trim();
 		if (!value) return;
-		input.value = "";
 		messageEl.textContent = "";
 		clearReject(input, form); // drop any lingering reject before resolving
 
@@ -157,20 +220,12 @@ function init(game: HTMLElement): void {
 				type: "ACCEPT",
 				woman: { id: g.woman.id, title: g.woman.name },
 			});
-			// One summary fetch serves both the card content and the background field
-			const summaryPromise = fetchSummary(g.woman.name);
-			const card = buildCard(g.woman.name, summaryPromise);
-			// Crossfade: existing card(s) exit on top while new card staggers in beneath
-			const existing = [...wall.children] as HTMLElement[];
-			wall.appendChild(card);
-			requestAnimationFrame(() => card.classList.add("is-shown"));
-			for (const child of existing) {
-				child.style.zIndex = "1";
-				child.classList.add("is-hiding");
-				child.classList.remove("is-shown");
-				setTimeout(() => child.remove(), 200);
-			}
-			// Morph the particle field to the new woman's portrait; fail-open
+			// Mask the submitted text with shimmer while the summary fetches.
+			// animateCard clears the shimmer + input when the summary lands.
+			// Capitalize to match the input's text-transform: capitalize,
+			// which the ::before gradient layer doesn't reliably inherit.
+			showShimmer(value.replace(/(^|\s)\S/g, (m) => m.toUpperCase()));
+			const summaryPromise = prefetchSummary(g.woman.name);
 			summaryPromise
 				.then((s) => {
 					if (!s.thumb) return;
@@ -181,19 +236,23 @@ function init(game: HTMLElement): void {
 					}
 				})
 				.catch(() => {});
+			void animateCard(g.woman.name, summaryPromise);
 			// fire-and-forget global write; fail-open
 			reportDiscovery(g.woman.id, value)
 				.then((r) => setCount(r.count))
 				.catch(() => {});
-		} else if (g.kind === "ambiguous") {
-			messageEl.textContent = "too common";
-			rejectShake(input, form);
-		} else if (g.kind === "none") {
-			messageEl.textContent = "not found";
-			rejectShake(input, form);
-		} else if (g.kind === "duplicate") {
-			messageEl.textContent = "already named";
-			rejectShake(input, form);
+		} else {
+			input.value = "";
+			if (g.kind === "ambiguous") {
+				messageEl.textContent = "too common";
+				rejectShake(input, form);
+			} else if (g.kind === "none") {
+				messageEl.textContent = "not found";
+				rejectShake(input, form);
+			} else if (g.kind === "duplicate") {
+				messageEl.textContent = "already named";
+				rejectShake(input, form);
+			}
 		}
 	});
 
@@ -202,6 +261,7 @@ function init(game: HTMLElement): void {
 		dispatch({ type: "RESET" });
 		messageEl.textContent = "";
 		clearReject(input, form);
+		hideShimmer();
 		clearWall(wall);
 		// mirror the idle→playing dock so the input glides back to center
 		dockInput(inputSlot, () => game.setAttribute("data-phase", "idle"));
