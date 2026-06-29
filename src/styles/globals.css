@@ -207,7 +207,8 @@
 	transition: border-color 150ms ease-out;
 	will-change: transform;
 }
-.t-input.is-error {
+.t-input.is-error,
+.t-input.is-excluded {
 	transition: border-color var(--revert-dur, 280ms) ease-out;
 }
 
@@ -218,7 +219,8 @@
 		opacity var(--revert-dur, 280ms) ease-out,
 		visibility 0s linear var(--revert-dur, 280ms);
 }
-.t-input-wrap.is-error .t-error-msg {
+.t-input-wrap.is-error .t-error-msg,
+.t-input-wrap.is-excluded .t-error-msg {
 	opacity: 1;
 	visibility: visible;
 	transition:
@@ -268,6 +270,14 @@
 }
 .t-input-wrap.is-error .t-error-msg {
 	@apply text-rose-500 dark:text-rose-400;
+}
+
+/* Excluded (recognized, but doesn't count) — purple, calmer than the red reject. */
+.t-input.is-excluded {
+	@apply border-violet-500 dark:border-violet-400;
+}
+.t-input-wrap.is-excluded .t-error-msg {
+	@apply text-violet-500 dark:text-violet-400;
 }
 
 /* Fake placeholder — per-word styling the native ::placeholder can't do.

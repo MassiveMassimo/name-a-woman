@@ -1,4 +1,9 @@
-import { buildIndex, type MatchIndex, parseRecords } from "../match";
+import {
+	buildIndex,
+	type ExcludedRecord,
+	type MatchIndex,
+	parseRecords,
+} from "../match";
 import {
 	clearReject,
 	clearWall,
@@ -6,6 +11,7 @@ import {
 	hideParticleField,
 	rejectShake,
 	revealParticleField,
+	showExcluded,
 	tickCounter,
 } from "./animations";
 import { isDevMode } from "./dev";
@@ -57,10 +63,10 @@ function init(game: HTMLElement): void {
 
 	// Fire fetchSummary if we haven't already; cached so repeated keystrokes
 	// for the same woman don't duplicate the request.
-	function prefetchSummary(name: string): Promise<Summary> {
+	function prefetchSummary(name: string, id: number): Promise<Summary> {
 		let p = summaryCache.get(name);
 		if (!p) {
-			p = fetchSummary(name);
+			p = fetchSummary(name, id);
 			summaryCache.set(name, p);
 		}
 		return p;
@@ -200,7 +206,7 @@ function init(game: HTMLElement): void {
 			if (value) {
 				const namedIds = new Set(state.named.map((n) => n.id));
 				const g = resolveGuess(value, index, namedIds);
-				if (g.kind === "accept") prefetchSummary(g.woman.name);
+				if (g.kind === "accept") prefetchSummary(g.woman.name, g.woman.id);
 			}
 		}
 	});
@@ -225,7 +231,7 @@ function init(game: HTMLElement): void {
 			// Capitalize to match the input's text-transform: capitalize,
 			// which the ::before gradient layer doesn't reliably inherit.
 			showShimmer(value.replace(/(^|\s)\S/g, (m) => m.toUpperCase()));
-			const summaryPromise = prefetchSummary(g.woman.name);
+			const summaryPromise = prefetchSummary(g.woman.name, g.woman.id);
 			summaryPromise
 				.then((s) => {
 					if (!s.thumb) return;
@@ -252,6 +258,11 @@ function init(game: HTMLElement): void {
 			} else if (g.kind === "duplicate") {
 				messageEl.textContent = "already named";
 				rejectShake(input, form);
+			} else if (g.kind === "excluded") {
+				// Recognized, but identifies outside the index — acknowledge in
+				// purple instead of a red reject.
+				messageEl.textContent = `${g.name} identifies as ${g.gender} — doesn't count`;
+				showExcluded(input, form);
 			}
 		}
 	});
@@ -275,13 +286,19 @@ function init(game: HTMLElement): void {
 
 	// load the index, then enable play; readout fades in to avoid a 0-of-0 flash
 	(async () => {
-		const [womenText, manifest] = await Promise.all([
+		const [womenText, excludedText, manifest] = await Promise.all([
 			fetch("/data/women.json").then((r) => r.text()),
+			// Fail-open: a missing/broken excluded list just disables the
+			// acknowledgement, never the game.
+			fetch("/data/excluded.json")
+				.then((r) => r.text())
+				.catch(() => "[]"),
 			fetch("/data/manifest.json").then(
 				(r) => r.json() as Promise<{ count: number }>,
 			),
 		]);
-		index = buildIndex(parseRecords(womenText));
+		const excluded = JSON.parse(excludedText) as ExcludedRecord[];
+		index = buildIndex(parseRecords(womenText), excluded);
 		ready = true;
 		totalEl.textContent = manifest.count.toLocaleString();
 		readout.classList.remove("opacity-0");
