@@ -145,6 +145,7 @@ export function createParticleField(
 	const darkMq = window.matchMedia("(prefers-color-scheme: dark)");
 	const onDarkChange = () => {
 		fillColor = darkMq.matches ? DARK_FILL : LIGHT_FILL;
+		if (currentImage) buildFresh(currentImage);
 	};
 	darkMq.addEventListener("change", onDarkChange);
 
@@ -219,7 +220,10 @@ export function createParticleField(
 				const g = data[idx + 1];
 				const b = data[idx + 2];
 				const a = data[idx + 3];
-				const brightness = (r + g + b) / 3;
+				const raw = (r + g + b) / 3;
+				// Light mode: sample the tonal inverse so the figure reads as a
+				// silhouette (dark regions become particles) on a light ground.
+				const brightness = darkMq.matches ? raw : 255 - raw;
 				if (a < 200 || brightness < threshold) continue;
 
 				const lum = brightness / 255;
