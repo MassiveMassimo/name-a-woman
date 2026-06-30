@@ -55,7 +55,7 @@ export interface ParticleFieldOptions {
 }
 
 export interface ParticleFieldHandle {
-	/** Load an image and spring-migrate particles to the new shape. */
+	/** Load an image and spring-morph particles to the new shape. */
 	morphTo: (src: string) => void;
 	/** Cancel RAF, disconnect observers, remove listeners. Idempotent. */
 	destroy: () => void;
@@ -63,6 +63,8 @@ export interface ParticleFieldHandle {
 	pause: () => void;
 	/** Restart the RAF loop. */
 	resume: () => void;
+	/** Clear all particles and forget the current image. */
+	reset: () => void;
 }
 
 const LIGHT_FILL = "rgba(10, 12, 16, 1)";
@@ -97,6 +99,7 @@ export function createParticleField(
 			destroy: () => {},
 			pause: () => {},
 			resume: () => {},
+			reset: () => {},
 		};
 
 	let particles: Particle[] = [];
@@ -571,6 +574,10 @@ export function createParticleField(
 		resume: () => {
 			paused = false;
 			if (!rafId && !destroyed) rafId = requestAnimationFrame(render);
+		},
+		reset: () => {
+			particles = [];
+			currentImage = null;
 		},
 	};
 }

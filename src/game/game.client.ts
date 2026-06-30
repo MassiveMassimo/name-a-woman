@@ -58,6 +58,10 @@ function init(game: HTMLElement): void {
 	let ready = false;
 	let prevCount = 0;
 	let timerId: ReturnType<typeof setInterval> | undefined;
+	// Bumped on START and RESET so pending summary callbacks can detect
+	// that their round has ended and bail out before morphing the field
+	// or swapping a stale card.
+	let roundToken = 0;
 
 	const summaryCache = new Map<string, Promise<Summary>>();
 
@@ -89,8 +93,18 @@ function init(game: HTMLElement): void {
 		if (state.phase === "over") {
 			clearInterval(timerId);
 			field?.pause();
+			// Fade the figure out behind the over-overlay so it's already
+			// gone before the overlay disappears on play-again.
+			if (bgCanvas) {
+				hideParticleField(bgCanvas);
+				fieldRevealed = false;
+			}
 		} else if (action.type === "RESET") {
+			field?.reset();
 			field?.resume();
+		}
+		if (action.type === "START" || action.type === "RESET") {
+			roundToken++;
 		}
 		render();
 	}
@@ -181,8 +195,10 @@ function init(game: HTMLElement): void {
 	async function animateCard(
 		name: string,
 		summaryPromise: Promise<Summary>,
+		token: number,
 	): Promise<void> {
 		const summary = await summaryPromise;
+		if (token !== roundToken) return;
 		hideShimmer();
 		input.value = "";
 		if (state.phase !== "playing") return;
@@ -231,9 +247,11 @@ function init(game: HTMLElement): void {
 			// Capitalize to match the input's text-transform: capitalize,
 			// which the ::before gradient layer doesn't reliably inherit.
 			showShimmer(value.replace(/(^|\s)\S/g, (m) => m.toUpperCase()));
+			const token = roundToken;
 			const summaryPromise = prefetchSummary(g.woman.name, g.woman.id);
 			summaryPromise
 				.then((s) => {
+					if (token !== roundToken) return;
 					if (!s.thumb) return;
 					field?.morphTo(s.thumb);
 					if (!fieldRevealed && bgCanvas) {
@@ -242,7 +260,7 @@ function init(game: HTMLElement): void {
 					}
 				})
 				.catch(() => {});
-			void animateCard(g.woman.name, summaryPromise);
+			void animateCard(g.woman.name, summaryPromise, token);
 			// fire-and-forget global write; fail-open
 			reportDiscovery(g.woman.id, value)
 				.then((r) => setCount(r.count))
@@ -267,21 +285,24 @@ function init(game: HTMLElement): void {
 		}
 	});
 
-	again.addEventListener("click", () => {
+	function playAgain(): void {
 		clearInterval(timerId);
 		dispatch({ type: "RESET" });
 		messageEl.textContent = "";
 		clearReject(input, form);
 		hideShimmer();
 		clearWall(wall);
+		input.value = "";
 		// mirror the idle→playing dock so the input glides back to center
 		dockInput(inputSlot, () => game.setAttribute("data-phase", "idle"));
 		input.focus();
-		// fade the particle field out; reset so the next correct guess re-reveals
-		if (bgCanvas) {
-			hideParticleField(bgCanvas);
-			fieldRevealed = false;
-		}
+	}
+
+	again.addEventListener("click", playAgain);
+
+	// Enter on the over screen restarts, matching the kbd hint on the button.
+	window.addEventListener("keydown", (e) => {
+		if (e.key === "Enter" && state.phase === "over") playAgain();
 	});
 
 	// load the index, then enable play; readout fades in to avoid a 0-of-0 flash

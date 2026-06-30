@@ -129,12 +129,13 @@ afterEach(() => {
 });
 
 describe("createParticleField", () => {
-	it("returns a handle with morphTo, destroy, pause, resume", () => {
+	it("returns a handle with morphTo, destroy, pause, resume, reset", () => {
 		const field = createParticleField(mockCanvas());
 		expect(typeof field.morphTo).toBe("function");
 		expect(typeof field.destroy).toBe("function");
 		expect(typeof field.pause).toBe("function");
 		expect(typeof field.resume).toBe("function");
+		expect(typeof field.reset).toBe("function");
 		field.destroy();
 	});
 
@@ -155,6 +156,15 @@ describe("createParticleField", () => {
 	it("pause and resume do not throw", () => {
 		const field = createParticleField(mockCanvas());
 		field.pause();
+		field.resume();
+		field.destroy();
+	});
+
+	it("reset clears particles after morphTo", async () => {
+		const field = createParticleField(mockCanvas());
+		field.morphTo("https://example.org/portrait.jpg");
+		await new Promise((r) => setTimeout(r, 10));
+		field.reset();
 		field.resume();
 		field.destroy();
 	});
